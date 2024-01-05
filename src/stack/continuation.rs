@@ -11,15 +11,20 @@
 * limitations under the License.
 */
 
+use super::{
+    items_deserialize, items_serialize, prepare_cont_serialize_vars, slice_deserialize,
+    slice_serialize, DeserializeItem,
+};
 use crate::{
     error::TvmError,
     executor::gas::gas_state::Gas,
-    stack::{SliceData, Stack, StackItem, savelist::SaveList},
+    stack::{savelist::SaveList, SliceData, Stack, StackItem},
     types::{Exception, ResultOpt},
 };
 use std::{fmt, mem};
-use ton_types::{BuilderData, Cell, IBitstring, Result, error, ExceptionCode, GasConsumer, HashmapE, HashmapType};
-use super::{slice_serialize, slice_deserialize, items_deserialize, items_serialize, prepare_cont_serialize_vars, DeserializeItem};
+use tvm_types::{
+    error, BuilderData, Cell, ExceptionCode, GasConsumer, HashmapE, HashmapType, IBitstring, Result,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ContinuationType {
@@ -70,7 +75,7 @@ impl ContinuationData {
             nargs: -1,
             savelist: Default::default(),
             stack: Stack::new(),
-            type_of: mem::take(&mut cont.type_of)
+            type_of: mem::take(&mut cont.type_of),
         }
     }
 
@@ -110,21 +115,21 @@ impl ContinuationData {
 
     pub fn with_code(code: SliceData) -> Self {
         ContinuationData {
-           code,
-           nargs: -1,
-           savelist: SaveList::new(),
-           stack: Stack::new(),
-           type_of: ContinuationType::Ordinary,
+            code,
+            nargs: -1,
+            savelist: SaveList::new(),
+            stack: Stack::new(),
+            type_of: ContinuationType::Ordinary,
         }
     }
 
     pub fn with_type(type_of: ContinuationType) -> Self {
         ContinuationData {
-           code: SliceData::default(),
-           nargs: -1,
-           savelist: SaveList::new(),
-           stack: Stack::new(),
-           type_of,
+            code: SliceData::default(),
+            nargs: -1,
+            savelist: SaveList::new(),
+            stack: Stack::new(),
+            type_of,
         }
     }
 
@@ -133,7 +138,8 @@ impl ContinuationData {
     }
 
     pub fn drain_reference(&mut self) -> Result<Cell> {
-        self.code.checked_drain_reference()
+        self.code
+            .checked_drain_reference()
             .map_err(|_| exception!(ExceptionCode::InvalidOpcode))
     }
 
@@ -143,7 +149,12 @@ impl ContinuationData {
         items_serialize(items, gas_consumer)
     }
 
-    pub(super) fn serialize_internal(&self, stack: BuilderData, savelist: HashmapE, gas_consumer: &mut dyn GasConsumer) -> Result<BuilderData> {
+    pub(super) fn serialize_internal(
+        &self,
+        stack: BuilderData,
+        savelist: HashmapE,
+        gas_consumer: &mut dyn GasConsumer,
+    ) -> Result<BuilderData> {
         let mut builder = BuilderData::new();
         match &self.type_of {
             ContinuationType::AgainLoopBody(body) => {
@@ -208,80 +219,107 @@ impl ContinuationData {
         Ok(builder)
     }
 
-    pub(crate) fn deserialize(slice: &mut SliceData, gas_consumer: &mut dyn GasConsumer) -> Result<Self> {
+    pub(crate) fn deserialize(
+        slice: &mut SliceData,
+        gas_consumer: &mut dyn GasConsumer,
+    ) -> Result<Self> {
         let mut list = Vec::new();
         ContinuationData::deserialize_internal(&mut list, slice, gas_consumer)?;
         Ok(std::mem::replace(
-            items_deserialize(list, gas_consumer)?.remove(0).as_continuation_mut()?,
-            ContinuationData::new_empty()
+            items_deserialize(list, gas_consumer)?
+                .remove(0)
+                .as_continuation_mut()?,
+            ContinuationData::new_empty(),
         ))
     }
 
     pub(crate) fn deserialize_internal(
         list: &mut Vec<DeserializeItem>,
         slice: &mut SliceData,
-        gas_consumer: &mut dyn GasConsumer
+        gas_consumer: &mut dyn GasConsumer,
     ) -> Result<()> {
         let mut new_list = Vec::new();
         let type_of = match slice.get_next_int(2)? {
             0 => ContinuationType::Ordinary,
-            1 => {
-                match slice.get_next_int(2)? {
-                    3 => {
-                        let depth = slice.get_next_u32()?;
-                        ContinuationType::CatchRevert(depth)
-                    }
-                    typ => return err!(ExceptionCode::UnknownError, "wrong continuation type 01{:2b}", typ)
+            1 => match slice.get_next_int(2)? {
+                3 => {
+                    let depth = slice.get_next_u32()?;
+                    ContinuationType::CatchRevert(depth)
                 }
-            }
-            2 => {
-                match slice.get_next_int(2)? {
-                    0 => {
-                        let exit_code = slice.get_next_int(32)? as i32;
-                        ContinuationType::Quit(exit_code)
-                    }
-                    1 => ContinuationType::TryCatch,
-                    2 => {
-                        let mut child_slice = gas_consumer.load_cell(slice.checked_drain_reference()?)?;
-                        let body = slice_deserialize(&mut child_slice)?;
-                        ContinuationType::UntilLoopCondition(body)
-                    }
-                    3 => ContinuationType::ExcQuit,
-                    typ => return err!(ExceptionCode::UnknownError, "wrong continuation type 10{:2b}", typ)
+                typ => {
+                    return err!(
+                        ExceptionCode::UnknownError,
+                        "wrong continuation type 01{:2b}",
+                        typ
+                    )
                 }
-            }
-            3 => {
-                match slice.get_next_int(2)? {
-                    0 => {
-                        let mut child_slice = gas_consumer.load_cell(slice.checked_drain_reference()?)?;
-                        let cond = slice_deserialize(&mut child_slice)?;
-                        let body = slice_deserialize(&mut child_slice)?;
-                        ContinuationType::WhileLoopCondition(body, cond)
-                    }
-                    1 => {
-                        let mut child_slice = gas_consumer.load_cell(slice.checked_drain_reference()?)?;
-                        let body = slice_deserialize(&mut child_slice)?;
-                        ContinuationType::AgainLoopBody(body)
-                    }
-                    2 => {
-                        let mut child_slice = gas_consumer.load_cell(slice.checked_drain_reference()?)?;
-                        let code = slice_deserialize(&mut child_slice)?;
-                        let counter = slice.get_next_int(32)? as isize;
-                        ContinuationType::RepeatLoopBody(code, counter)
-                    }
-                    3 => {
-                        let value = slice.get_next_int(32)? as i32;
-                        ContinuationType::PushInt(value)
-                    }
-                    typ => return err!(ExceptionCode::UnknownError, "wrong continuation type 10{:2b}", typ)
+            },
+            2 => match slice.get_next_int(2)? {
+                0 => {
+                    let exit_code = slice.get_next_int(32)? as i32;
+                    ContinuationType::Quit(exit_code)
                 }
+                1 => ContinuationType::TryCatch,
+                2 => {
+                    let mut child_slice =
+                        gas_consumer.load_cell(slice.checked_drain_reference()?)?;
+                    let body = slice_deserialize(&mut child_slice)?;
+                    ContinuationType::UntilLoopCondition(body)
+                }
+                3 => ContinuationType::ExcQuit,
+                typ => {
+                    return err!(
+                        ExceptionCode::UnknownError,
+                        "wrong continuation type 10{:2b}",
+                        typ
+                    )
+                }
+            },
+            3 => match slice.get_next_int(2)? {
+                0 => {
+                    let mut child_slice =
+                        gas_consumer.load_cell(slice.checked_drain_reference()?)?;
+                    let cond = slice_deserialize(&mut child_slice)?;
+                    let body = slice_deserialize(&mut child_slice)?;
+                    ContinuationType::WhileLoopCondition(body, cond)
+                }
+                1 => {
+                    let mut child_slice =
+                        gas_consumer.load_cell(slice.checked_drain_reference()?)?;
+                    let body = slice_deserialize(&mut child_slice)?;
+                    ContinuationType::AgainLoopBody(body)
+                }
+                2 => {
+                    let mut child_slice =
+                        gas_consumer.load_cell(slice.checked_drain_reference()?)?;
+                    let code = slice_deserialize(&mut child_slice)?;
+                    let counter = slice.get_next_int(32)? as isize;
+                    ContinuationType::RepeatLoopBody(code, counter)
+                }
+                3 => {
+                    let value = slice.get_next_int(32)? as i32;
+                    ContinuationType::PushInt(value)
+                }
+                typ => {
+                    return err!(
+                        ExceptionCode::UnknownError,
+                        "wrong continuation type 10{:2b}",
+                        typ
+                    )
+                }
+            },
+            typ => {
+                return err!(
+                    ExceptionCode::UnknownError,
+                    "wrong continuation type {:2b}",
+                    typ
+                )
             }
-            typ => return err!(ExceptionCode::UnknownError, "wrong continuation type {:2b}", typ)
         };
 
         let nargs = match slice.get_next_int(22)? as isize {
             0x3fffff => -1, // 4194303
-            x => x
+            x => x,
         };
         let stack = if slice.get_next_bit()? {
             let length = slice.get_next_int(24)? as usize;
@@ -359,7 +397,7 @@ impl ContinuationData {
             }
             ContinuationType::CatchRevert(_depth) => {
                 // old serialization knows nothing about CatchRevert
-                return err!(ExceptionCode::UnknownError)
+                return err!(ExceptionCode::UnknownError);
             }
         }
 
@@ -396,59 +434,53 @@ impl ContinuationData {
         let mut gas = 0;
         let cont_type = match slice.get_next_int(2)? {
             0 => Ok(ContinuationType::Ordinary),
-            2 => {
-                match slice.get_next_int(2)? {
-                    0 => {
-                        let exit_code = slice.get_next_int(32)? as i32;
-                        Ok(ContinuationType::Quit(exit_code))
-                    }
-                    1 => Ok(ContinuationType::TryCatch),
-                    2 => {
-                        let mut body_slice = SliceData::load_cell(slice.checked_drain_reference()?)?;
-                        let body: SliceData = slice_deserialize(&mut body_slice)?;
-                        Ok(ContinuationType::UntilLoopCondition(body))
-                    }
-                    3 => {
-                        Ok(ContinuationType::ExcQuit)
-                    }
-                    _ => err!(ExceptionCode::UnknownError)
+            2 => match slice.get_next_int(2)? {
+                0 => {
+                    let exit_code = slice.get_next_int(32)? as i32;
+                    Ok(ContinuationType::Quit(exit_code))
                 }
-            }
-            3 => {
-                match slice.get_next_int(2)? {
-                    0 => {
-                        let mut cond_slice = SliceData::load_cell(slice.checked_drain_reference()?)?;
-                        let cond: SliceData = slice_deserialize(&mut cond_slice)?;
-                        gas += Gas::load_cell_price(true);
-                        let mut body_slice = SliceData::load_cell(slice.checked_drain_reference()?)?;
-                        let body: SliceData = slice_deserialize(&mut body_slice)?;
-                        gas += Gas::load_cell_price(true);
-                        Ok(ContinuationType::WhileLoopCondition(body, cond))
-                    }
-                    1 => {
-                        let mut body_slice = SliceData::load_cell(slice.checked_drain_reference()?)?;
-                        let body: SliceData = slice_deserialize(&mut body_slice)?;
-                        Ok(ContinuationType::AgainLoopBody(body))
-                    }
-                    2 => {
-                        let mut code_slice = SliceData::load_cell(slice.checked_drain_reference()?)?;
-                        let code: SliceData = slice_deserialize(&mut code_slice)?;
-                        let counter = slice.get_next_int(32)? as isize;
-                        Ok(ContinuationType::RepeatLoopBody(code, counter))
-                    }
-                    3 => {
-                        let value = slice.get_next_int(32)? as i32;
-                        Ok(ContinuationType::PushInt(value))
-                    }
-                    _ => err!(ExceptionCode::UnknownError)
+                1 => Ok(ContinuationType::TryCatch),
+                2 => {
+                    let mut body_slice = SliceData::load_cell(slice.checked_drain_reference()?)?;
+                    let body: SliceData = slice_deserialize(&mut body_slice)?;
+                    Ok(ContinuationType::UntilLoopCondition(body))
                 }
-            }
-            _ => err!(ExceptionCode::UnknownError)
+                3 => Ok(ContinuationType::ExcQuit),
+                _ => err!(ExceptionCode::UnknownError),
+            },
+            3 => match slice.get_next_int(2)? {
+                0 => {
+                    let mut cond_slice = SliceData::load_cell(slice.checked_drain_reference()?)?;
+                    let cond: SliceData = slice_deserialize(&mut cond_slice)?;
+                    gas += Gas::load_cell_price(true);
+                    let mut body_slice = SliceData::load_cell(slice.checked_drain_reference()?)?;
+                    let body: SliceData = slice_deserialize(&mut body_slice)?;
+                    gas += Gas::load_cell_price(true);
+                    Ok(ContinuationType::WhileLoopCondition(body, cond))
+                }
+                1 => {
+                    let mut body_slice = SliceData::load_cell(slice.checked_drain_reference()?)?;
+                    let body: SliceData = slice_deserialize(&mut body_slice)?;
+                    Ok(ContinuationType::AgainLoopBody(body))
+                }
+                2 => {
+                    let mut code_slice = SliceData::load_cell(slice.checked_drain_reference()?)?;
+                    let code: SliceData = slice_deserialize(&mut code_slice)?;
+                    let counter = slice.get_next_int(32)? as isize;
+                    Ok(ContinuationType::RepeatLoopBody(code, counter))
+                }
+                3 => {
+                    let value = slice.get_next_int(32)? as i32;
+                    Ok(ContinuationType::PushInt(value))
+                }
+                _ => err!(ExceptionCode::UnknownError),
+            },
+            _ => err!(ExceptionCode::UnknownError),
         }?;
 
         let nargs = match slice.get_next_int(22)? as isize {
             0x3fffff => -1,
-            x => x
+            x => x,
         };
         let stack = match slice.get_next_bit()? {
             false => vec![],
@@ -476,15 +508,16 @@ impl ContinuationData {
         slice.get_next_int(16)?; // codepage
         let code = slice_deserialize(slice)?;
         gas += Gas::load_cell_price(true);
-        Ok((ContinuationData {
-            code,
-            nargs,
-            savelist: save,
-            stack: Stack {
-                storage: stack
+        Ok((
+            ContinuationData {
+                code,
+                nargs,
+                savelist: save,
+                stack: Stack { storage: stack },
+                type_of: cont_type,
             },
-            type_of: cont_type
-        }, gas))
+            gas,
+        ))
     }
 }
 
@@ -496,7 +529,11 @@ impl Default for ContinuationData {
 
 impl fmt::Display for ContinuationData {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{\n    type: {}\n    code: {}    nargs: {}\n    stack: ", self.type_of, self.code, self.nargs)?;
+        write!(
+            f,
+            "{{\n    type: {}\n    code: {}    nargs: {}\n    stack: ",
+            self.type_of, self.code, self.nargs
+        )?;
         if self.stack.depth() == 0 {
             writeln!(f, "empty")?;
         } else {

@@ -23,12 +23,12 @@ use std::{
     collections::HashMap,
     sync::Arc,
 };
-use ton_block::{
+use tvm_block::{
     Account, ConfigParam1, ConfigParam15, ConfigParam16, ConfigParam17, ConfigParam34,
     DelectorParams, Deserializable, GlobalCapabilities, Grams, MsgAddress, MsgAddressInt,
     Serializable, ShardAccount, SigPubKey, ValidatorDescr, ValidatorSet,
 };
-use ton_types::{
+use tvm_types::{
     error, fail, BuilderData, Cell, ExceptionCode, GasConsumer, HashmapE, IBitstring, Result,
     SliceData, UInt256,
 };
@@ -428,7 +428,10 @@ fn process_validator(
 }
 
 /// determine if staker is valid and return its address and parameters
-fn process_staker(shard_acc: &ShardAccount, gas_consumer: &mut dyn GasConsumer) -> Result<(MsgAddressInt, Staker)> {
+fn process_staker(
+    shard_acc: &ShardAccount,
+    gas_consumer: &mut dyn GasConsumer,
+) -> Result<(MsgAddressInt, Staker)> {
     let account = shard_acc.read_account()?;
     let mut data = match account.get_data() {
         Some(data) => SliceData::load_cell(data)?,
@@ -478,7 +481,7 @@ fn find_validators(engine: &mut Engine, cfg17: &ConfigParam17) -> Result<Vec<Val
     let cfg34_result = engine.read_config_param::<ConfigParam34>(34);
     let cur_validators = match cfg34_result.as_ref() {
         Ok(cfg34) => cfg34.cur_validators.list(),
-        _ => &[]
+        _ => &[],
     };
     let min_stake = cfg17.min_stake.as_u128();
     let max_stake = cfg17.max_stake.as_u128();

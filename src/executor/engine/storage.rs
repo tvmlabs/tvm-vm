@@ -11,18 +11,18 @@
 * limitations under the License.
 */
 
+use crate::executor::gas::gas_state::Gas;
 use crate::{
     error::TvmError,
     executor::{
         engine::Engine,
-        microcode::{VAR, STACK, CC, CC_SAVELIST, CTRL, CTRL_SAVELIST, VAR_SAVELIST}
+        microcode::{CC, CC_SAVELIST, CTRL, CTRL_SAVELIST, STACK, VAR, VAR_SAVELIST},
     },
-    stack::{StackItem, continuation::ContinuationData, savelist::SaveList},
-    types::{Exception, ResultMut, ResultRef, Status}
+    stack::{continuation::ContinuationData, savelist::SaveList, StackItem},
+    types::{Exception, ResultMut, ResultRef, Status},
 };
 use std::{mem, ops::Range};
-use ton_types::{error, fail, Result, types::ExceptionCode};
-use crate::executor::gas::gas_state::Gas;
+use tvm_types::{error, fail, types::ExceptionCode, Result};
 
 // Utilities ******************************************************************
 
@@ -31,9 +31,9 @@ fn continuation_by_address(engine: &mut Engine, address: u16) -> ResultRef<Conti
         VAR => engine.cmd.var(storage_index!(address)).as_continuation(),
         CTRL => match engine.ctrls.get(storage_index!(address)) {
             Some(ctrl) => ctrl.as_continuation(),
-            None => fail!(ExceptionCode::TypeCheckError)
+            None => fail!(ExceptionCode::TypeCheckError),
         },
-        _ => fail!("continuation_by_address: {:X}", address_tag!(address))
+        _ => fail!("continuation_by_address: {:X}", address_tag!(address)),
     }
 }
 
@@ -41,26 +41,25 @@ fn continuation_by_address(engine: &mut Engine, address: u16) -> ResultRef<Conti
 macro_rules! continuation_mut_by_address {
     ($engine:ident, $address:expr) => {
         match address_tag!($address) {
-            VAR => $engine.cmd.var_mut(storage_index!($address)).as_continuation_mut(),
+            VAR => $engine
+                .cmd
+                .var_mut(storage_index!($address))
+                .as_continuation_mut(),
             CTRL => match $engine.ctrls.get_mut(storage_index!($address)) {
                 Some(ctrl) => ctrl.as_continuation_mut(),
-                None => fail!(ExceptionCode::TypeCheckError)
+                None => fail!(ExceptionCode::TypeCheckError),
             },
-            _ => fail!("continuation_mut_by_address: {:X}", address_tag!($address))
+            _ => fail!("continuation_mut_by_address: {:X}", address_tag!($address)),
         }
     };
 }
 
-fn move_stack_from_cc(
-    engine: &mut Engine,
-    dst: u16,
-    drop: Range<usize>,
-) -> Status {
+fn move_stack_from_cc(engine: &mut Engine, dst: u16, drop: Range<usize>) -> Status {
     let save = drop.len();
     let peer = continuation_mut_by_address!(engine, dst)?;
     if peer.nargs >= 0 {
         if save > peer.nargs as usize {
-            return err!(ExceptionCode::StackOverflow)
+            return err!(ExceptionCode::StackOverflow);
         } else {
             peer.nargs -= save as isize
         }
@@ -68,7 +67,13 @@ fn move_stack_from_cc(
     if drop.start == 0 {
         let src_len = engine.cc.stack.depth();
         if src_len < drop.end {
-            return err!(ExceptionCode::StackUnderflow, "drop_range: {}..{}, depth: {}", drop.start, drop.end, src_len)
+            return err!(
+                ExceptionCode::StackUnderflow,
+                "drop_range: {}..{}, depth: {}",
+                drop.start,
+                drop.end,
+                src_len
+            );
         }
         if peer.stack.is_empty() && drop.end == src_len {
             mem::swap(&mut peer.stack, &mut engine.cc.stack);
@@ -87,7 +92,7 @@ fn move_stack_from_cc(
 
 struct Info {
     flags: u16,
-    index: usize
+    index: usize,
 }
 
 impl std::fmt::UpperHex for Info {
@@ -100,7 +105,7 @@ impl Info {
     fn item<'a>(&self, engine: &'a mut Engine) -> ResultMut<'a, StackItem> {
         match address_tag!(self.flags) {
             VAR => Ok(engine.cmd.var_mut(self.index)),
-            _ => fail!("Info.item {:x}\n", self.flags)
+            _ => fail!("Info.item {:x}\n", self.flags),
         }
     }
     #[rustfmt::skip]
@@ -136,7 +141,11 @@ fn put_to_list(engine: &mut Engine, x: &mut Info, y: &mut StackItem) -> Result<O
 fn put_to_list_from_item(engine: &mut Engine, x: &mut Info, y: &Info) -> Result<Option<StackItem>> {
     if !SaveList::can_put(x.index, y.item(engine)?) {
         if log::log_enabled!(log::Level::Error) {
-            let value = x.list(engine)?.get(x.index).cloned().unwrap_or_else(StackItem::default);
+            let value = x
+                .list(engine)?
+                .get(x.index)
+                .cloned()
+                .unwrap_or_else(StackItem::default);
             log::error!(
                 target: "tvm",
                 "Cannot set: {} to list with index: {} and value: {}",
@@ -150,18 +159,30 @@ fn put_to_list_from_item(engine: &mut Engine, x: &mut Info, y: &Info) -> Result<
     }
 }
 
-fn put_to_list_from_list(engine: &mut Engine, x: &mut Info, y: &mut Info) -> Result<Option<StackItem>> {
+fn put_to_list_from_list(
+    engine: &mut Engine,
+    x: &mut Info,
+    y: &mut Info,
+) -> Result<Option<StackItem>> {
     x.list(engine)?;
     if let Some(new) = y.list(engine)?.get(y.index) {
         if SaveList::can_put(x.index, new) {
             if let Some(mut y) = y.list(engine)?.remove(y.index) {
-                return x.list(engine)?.put(x.index, &mut y)
+                return x.list(engine)?.put(x.index, &mut y);
             }
         }
     }
     if log::log_enabled!(log::Level::Error) {
-        let old = x.list(engine)?.get(x.index).cloned().unwrap_or_else(StackItem::default);
-        let new = y.list(engine)?.get(y.index).cloned().unwrap_or_else(StackItem::default);
+        let old = x
+            .list(engine)?
+            .get(x.index)
+            .cloned()
+            .unwrap_or_else(StackItem::default);
+        let new = y
+            .list(engine)?
+            .get(y.index)
+            .cloned()
+            .unwrap_or_else(StackItem::default);
         log::error!(
             target: "tvm",
             "Cannot set: {} to list with index: {} and value: {}",
@@ -175,7 +196,7 @@ fn swap_with_list(engine: &mut Engine, mut x: Info, y: Info) -> Status {
     if x.list(engine)?.get(x.index).is_some() || !y.item(engine)?.is_null() {
         *y.item(engine)? = match put_to_list_from_item(engine, &mut x, &y)? {
             Some(x) => x,
-            None => StackItem::None
+            None => StackItem::None,
         };
     }
     Ok(())
@@ -210,33 +231,33 @@ pub(in crate::executor) fn swap(engine: &mut Engine, mut x: u16, mut y: u16) -> 
         CC_SAVELIST | CTRL | CTRL_SAVELIST | VAR_SAVELIST => match address_tag!(y.flags) {
             CC_SAVELIST | CTRL | CTRL_SAVELIST | VAR_SAVELIST => swap_between_lists(engine, x, y),
             VAR => swap_with_list(engine, x, y),
-            _ => fail!("swap_any: {:X}, {:X}", x, y)
+            _ => fail!("swap_any: {:X}, {:X}", x, y),
         },
         CC => match address_tag!(y.flags) {
             CTRL => match engine.ctrls.get_mut(y.index) {
                 Some(c) => {
                     mem::swap(c.as_continuation_mut()?, &mut engine.cc);
                     Ok(())
-                },
-                None => err!(ExceptionCode::TypeCheckError)
+                }
+                None => err!(ExceptionCode::TypeCheckError),
             },
             VAR => {
                 mem::swap(
                     engine.cmd.var_mut(y.index).as_continuation_mut()?,
-                    &mut engine.cc
+                    &mut engine.cc,
                 );
                 Ok(())
-            },
-            _ => fail!("swap CC-{:X}", y)
+            }
+            _ => fail!("swap CC-{:X}", y),
         },
         VAR => match address_tag!(y.flags) {
             CC_SAVELIST | CTRL_SAVELIST | VAR_SAVELIST => swap_with_list(engine, y, x),
             VAR => {
                 engine.cmd.vars.swap(x.index, y.index);
                 Ok(())
-            },
-            _ => fail!("swap_any: {:X}, {:X}", x, y)
-        }
+            }
+            _ => fail!("swap_any: {:X}, {:X}", x, y),
+        },
         _ => {
             fail!("swap_any {:X}-{:X}", x, y)
         }
@@ -266,14 +287,18 @@ pub(in crate::executor) fn copy_to_var(engine: &mut Engine, src: u16) -> Status 
             let copy = engine.cc.copy_without_stack();
             StackItem::continuation(copy)
         }
-        CTRL => engine.ctrls.get(storage_index!(src)).cloned().unwrap_or_default(),
+        CTRL => engine
+            .ctrls
+            .get(storage_index!(src))
+            .cloned()
+            .unwrap_or_default(),
         // CTRL => match engine.ctrls.get(storage_index!(src)) {
         //     Some(ctrl) => ctrl.clone(),
         //     None => return err!(ExceptionCode::TypeCheckError, "read empty control register {}", storage_index!(src))
         // }
         STACK => engine.cc.stack.get(stack_index!(src)).clone(),
         VAR => engine.cmd.var(storage_index!(src)).clone(),
-        _ => fail!("copy_to_var: {}", src)
+        _ => fail!("copy_to_var: {}", src),
     };
     engine.cmd.push_var(copy);
     Ok(())
@@ -283,7 +308,7 @@ pub(in crate::executor) fn copy_to_var(engine: &mut Engine, src: u16) -> Status 
 pub(in crate::executor) fn fetch_reference(engine: &mut Engine, src: u16) -> Status {
     let cell = match address_tag!(src) {
         CC => engine.cc.drain_reference()?,
-        _ => fail!("fetch_reference: {:X}", src)
+        _ => fail!("fetch_reference: {:X}", src),
     };
     engine.cmd.push_var(StackItem::Cell(cell));
     Ok(())
@@ -294,7 +319,10 @@ pub(in crate::executor) fn fetch_stack(engine: &mut Engine, depth: usize) -> Sta
     if engine.cc.stack.depth() < depth {
         err!(ExceptionCode::StackUnderflow)
     } else {
-        engine.cmd.vars.append(&mut engine.cc.stack.drop_range(0..depth)?);
+        engine
+            .cmd
+            .vars
+            .append(&mut engine.cc.stack.drop_range(0..depth)?);
         Ok(())
     }
 }
@@ -309,7 +337,13 @@ pub(in crate::executor) fn pop_all(engine: &mut Engine, dst: u16) -> Status {
         pargs.unwrap_or(depth)
     } else if let Some(pargs) = pargs {
         if pargs < nargs as usize {
-            return err!(ExceptionCode::StackUnderflow, "depth: {}, pargs: {}, nargs: {}", depth, pargs, nargs)
+            return err!(
+                ExceptionCode::StackUnderflow,
+                "depth: {}, pargs: {}, nargs: {}",
+                depth,
+                pargs,
+                nargs
+            );
         }
         pargs
     } else {

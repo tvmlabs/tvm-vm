@@ -12,25 +12,27 @@
 */
 
 use crate::{
-   executor::{
-       engine::Engine,
-       dump::{
-           BIN, dump_var, execute_dump_bin, execute_dump_hex, execute_dump_stack,
-           execute_dump_stack_top, execute_dump_str, execute_dump_string,
-           execute_print_bin, execute_print_hex, execute_print_str, HEX, STR
-       }
-   },
-   stack::{Stack, StackItem, integer::IntegerData}
+    executor::{
+        dump::{
+            dump_var, execute_dump_bin, execute_dump_hex, execute_dump_stack,
+            execute_dump_stack_top, execute_dump_str, execute_dump_string, execute_print_bin,
+            execute_print_hex, execute_print_str, BIN, HEX, STR,
+        },
+        engine::Engine,
+    },
+    stack::{integer::IntegerData, Stack, StackItem},
 };
-use ton_types::{BuilderData, SliceData};
+use tvm_types::{BuilderData, SliceData};
 
 #[test]
 fn test_dump_var() {
-    [0, 15, 23466454, 347387434, 4383434].iter().for_each(|value| {
-        assert_eq!(format!("{}", *value), dump_var(&int!(*value), 0));
-        assert_eq!(format!("{:X}", *value), dump_var(&int!(*value), HEX));
-        assert_eq!(format!("{:b}", *value), dump_var(&int!(*value), BIN));
-    });
+    [0, 15, 23466454, 347387434, 4383434]
+        .iter()
+        .for_each(|value| {
+            assert_eq!(format!("{}", *value), dump_var(&int!(*value), 0));
+            assert_eq!(format!("{:X}", *value), dump_var(&int!(*value), HEX));
+            assert_eq!(format!("{:b}", *value), dump_var(&int!(*value), BIN));
+        });
     [-15, -23466454, -476343874].iter().for_each(|value| {
         assert_eq!(format!("{}", *value), dump_var(&int!(*value), 0));
         assert_eq!(format!("-{:X}", -*value), dump_var(&int!(*value), HEX));
@@ -54,7 +56,11 @@ fn test_dump_commands() {
     stack.push(StackItem::Slice(SliceData::load_builder(builder).unwrap()));
     stack.push(int!(int));
     let engine = &mut Engine::with_capabilities(0).setup_with_libraries(
-        SliceData::new(vec![1, 0, 0x0A, 0x80]), None, Some(stack), None, vec![]
+        SliceData::new(vec![1, 0, 0x0A, 0x80]),
+        None,
+        Some(stack),
+        None,
+        vec![],
     );
     log::trace!("--- {} as str\n", int);
     execute_dump_str(engine).unwrap();

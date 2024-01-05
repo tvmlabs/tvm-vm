@@ -12,7 +12,7 @@
 */
 
 use crate::stack::integer::IntegerData;
-use ton_types::types::ExceptionCode;
+use tvm_types::types::ExceptionCode;
 
 #[test]
 fn test_into() {
@@ -20,7 +20,16 @@ fn test_into() {
     let nan = IntegerData::nan();
 
     assert_eq!(IntegerData::into(&one, 0..=1).unwrap(), 1i8);
-    assert_eq!(crate::error::tvm_exception_code(&IntegerData::into(&one, 0..=0).unwrap_err()), Some(ExceptionCode::RangeCheckError));
-    assert_eq!(crate::error::tvm_exception_code(&IntegerData::into(&one, 2..=2).unwrap_err()), Some(ExceptionCode::RangeCheckError));
-    assert_eq!(crate::error::tvm_exception_code(&IntegerData::into(&nan, 0..=0).unwrap_err()), Some(ExceptionCode::RangeCheckError));
+    assert_eq!(
+        crate::error::tvm_exception_code(&IntegerData::into(&one, 0..=0).unwrap_err()),
+        Some(ExceptionCode::RangeCheckError)
+    );
+    assert_eq!(
+        crate::error::tvm_exception_code(&IntegerData::into(&one, 2..=2).unwrap_err()),
+        Some(ExceptionCode::RangeCheckError)
+    );
+    assert_eq!(
+        crate::error::tvm_exception_code(&IntegerData::into(&nan, 0..=0).unwrap_err()),
+        Some(ExceptionCode::RangeCheckError)
+    );
 }

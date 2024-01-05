@@ -1,4 +1,3 @@
-
 /*
 * Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
 *
@@ -18,9 +17,9 @@ use crate::{
         behavior::{OperationBehavior, Quiet, Signaling},
         serialization::Encoding,
     },
-    types::{ResultOpt, Exception},
+    types::{Exception, ResultOpt},
 };
-use ton_types::{error, BuilderData, ExceptionCode, Result, SliceData};
+use tvm_types::{error, BuilderData, ExceptionCode, Result, SliceData};
 
 use core::mem;
 use num_traits::{One, Signed, Zero};
@@ -36,23 +35,21 @@ type Int = num::BigInt;
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum IntegerValue {
     NaN,
-    Value(Int)
+    Value(Int),
 }
 
 impl cmp::PartialOrd for IntegerValue {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match (self, other) {
-            (IntegerValue::Value(x), IntegerValue::Value(y)) => {
-                x.partial_cmp(y)
-            },
-            _ => None
+            (IntegerValue::Value(x), IntegerValue::Value(y)) => x.partial_cmp(y),
+            _ => None,
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct IntegerData {
-    value: IntegerValue
+    value: IntegerValue,
 }
 
 impl Default for IntegerData {
@@ -62,7 +59,6 @@ impl Default for IntegerData {
 }
 
 impl IntegerData {
-
     /// Constructs new (set to 0) value. This is just a wrapper for Self::zero().
     #[inline]
     pub fn new() -> IntegerData {
@@ -73,7 +69,7 @@ impl IntegerData {
     #[inline]
     pub fn zero() -> IntegerData {
         IntegerData {
-            value: IntegerValue::Value(Int::zero())
+            value: IntegerValue::Value(Int::zero()),
         }
     }
 
@@ -81,7 +77,7 @@ impl IntegerData {
     #[inline]
     pub fn one() -> IntegerData {
         IntegerData {
-            value: IntegerValue::Value(Int::one())
+            value: IntegerValue::Value(Int::one()),
         }
     }
 
@@ -89,12 +85,10 @@ impl IntegerData {
     #[inline]
     pub fn minus_one() -> IntegerData {
         IntegerData {
-            value: IntegerValue::Value(
-                Int::from_biguint(
-                    num::bigint::Sign::Minus,
-                    num::BigUint::one()
-                )
-            )
+            value: IntegerValue::Value(Int::from_biguint(
+                num::bigint::Sign::Minus,
+                num::BigUint::one(),
+            )),
         }
     }
 
@@ -102,7 +96,7 @@ impl IntegerData {
     #[inline]
     pub fn nan() -> IntegerData {
         IntegerData {
-            value: IntegerValue::NaN
+            value: IntegerValue::NaN,
         }
     }
 
@@ -110,8 +104,10 @@ impl IntegerData {
     /// it must be refactored to simplify
     pub fn mask(bits: usize) -> Self {
         IntegerData::one()
-            .shl::<Quiet>(bits).unwrap()
-            .sub::<Quiet>(&IntegerData::one()).unwrap()
+            .shl::<Quiet>(bits)
+            .unwrap()
+            .sub::<Quiet>(&IntegerData::one())
+            .unwrap()
     }
 
     /// Clears value (sets to 0).
@@ -137,7 +133,7 @@ impl IntegerData {
     pub fn is_neg(&self) -> bool {
         match &self.value {
             IntegerValue::NaN => false,
-            IntegerValue::Value(ref value) => value.is_negative()
+            IntegerValue::Value(ref value) => value.is_negative(),
         }
     }
 
@@ -159,14 +155,14 @@ impl IntegerData {
     pub fn is_zero(&self) -> bool {
         match &self.value {
             IntegerValue::NaN => false,
-            IntegerValue::Value(ref value) => value.is_zero()
+            IntegerValue::Value(ref value) => value.is_zero(),
         }
     }
 
     /// constuct
     pub fn from_unsigned_bytes_be(data: impl AsRef<[u8]>) -> Self {
         Self {
-            value: IntegerValue::Value(Int::from_bytes_be(num::bigint::Sign::Plus, data.as_ref()))
+            value: IntegerValue::Value(Int::from_bytes_be(num::bigint::Sign::Plus, data.as_ref())),
         }
     }
 
@@ -197,9 +193,7 @@ impl IntegerData {
     /// Determines a fewest bits necessary to express signed value.
     #[inline]
     pub fn bitsize(&self) -> Result<usize> {
-        utils::process_value(self, |value| {
-            Ok(utils::bitsize(value))
-        })
+        utils::process_value(self, |value| Ok(utils::bitsize(value)))
     }
 
     /// Determines a fewest bits necessary to express unsigned value.
@@ -259,10 +253,10 @@ pub mod utils {
                 IntegerValue::NaN => {
                     on_nan_parameter!($T)?;
                     return Ok($nan_constructor());
-                },
+                }
                 IntegerValue::Value(ref $v) => $v,
             }
-        }
+        };
     }
 
     /// Unary operation. Checks lhs for NaN, unwraps it, calls closure and returns wrapped result.
@@ -271,7 +265,7 @@ pub mod utils {
         lhs: &IntegerData,
         callback: F,
         nan_constructor: FNaN,
-        result_processor: FRes
+        result_processor: FRes,
     ) -> Result<R>
     where
         T: OperationBehavior,
@@ -291,7 +285,7 @@ pub mod utils {
         rhs: &IntegerData,
         callback: F,
         nan_constructor: FNaN,
-        result_processor: FRes
+        result_processor: FRes,
     ) -> Result<R>
     where
         T: OperationBehavior,
@@ -318,8 +312,10 @@ pub mod utils {
     }
 
     #[inline]
-    pub fn process_double_result<T, FNaN>(result: (Int, Int), nan_constructor: FNaN)
-        -> Result<(IntegerData, IntegerData)>
+    pub fn process_double_result<T, FNaN>(
+        result: (Int, Int),
+        nan_constructor: FNaN,
+    ) -> Result<(IntegerData, IntegerData)>
     where
         T: OperationBehavior,
         FNaN: Fn() -> (IntegerData, IntegerData),
@@ -330,7 +326,7 @@ pub mod utils {
             Err(_) => {
                 on_integer_overflow!(T)?;
                 Ok(nan_constructor())
-            },
+            }
         }
     }
 
@@ -352,19 +348,20 @@ pub mod utils {
 
     #[inline]
     pub fn bitsize(value: &Int) -> usize {
-        if value.is_zero() ||
-           (value == &Int::from_biguint(num::bigint::Sign::Minus, num::BigUint::one())) {
-            return 1
+        if value.is_zero()
+            || (value == &Int::from_biguint(num::bigint::Sign::Minus, num::BigUint::one()))
+        {
+            return 1;
         }
         let res = value.bits() as usize;
         if value.is_positive() {
-            return res + 1
+            return res + 1;
         }
         // For negative values value.bits() returns correct result only when value is power of 2.
         let mut modpow2 = value.abs();
         modpow2 &= &modpow2 - 1;
         if modpow2.is_zero() {
-            return res
+            return res;
         }
         res + 1
     }
@@ -389,9 +386,9 @@ pub mod utils {
 
 #[macro_use]
 pub mod conversion;
-pub mod serialization;
-pub mod math;
 pub mod bitlogics;
+pub mod math;
+pub mod serialization;
 
 #[cfg(test)]
 #[path = "tests/test_integer.rs"]

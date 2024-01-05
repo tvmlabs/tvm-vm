@@ -13,7 +13,7 @@
 
 use crate::{error::TvmError, types::Exception};
 use std::cmp::{max, min};
-use ton_types::{error, Result, types::ExceptionCode};
+use tvm_types::{error, types::ExceptionCode, Result};
 
 // Gas state
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -99,11 +99,18 @@ impl Gas {
         }
     }
     /// Compute instruction cost
-    pub const fn basic_gas_price(instruction_length: usize, _instruction_references_count: usize) -> i64 {
+    pub const fn basic_gas_price(
+        instruction_length: usize,
+        _instruction_references_count: usize,
+    ) -> i64 {
         // old formula from spec: (10 + instruction_length + 5 * instruction_references_count) as i64
         (10 + instruction_length) as i64
     }
-    pub fn consume_basic(&mut self, instruction_length: usize, _instruction_references_count: usize) -> i64 {
+    pub fn consume_basic(
+        &mut self,
+        instruction_length: usize,
+        _instruction_references_count: usize,
+    ) -> i64 {
         // old formula from spec: (10 + instruction_length + 5 * instruction_references_count) as i64
         self.use_gas((10 + instruction_length) as i64)
     }
@@ -142,10 +149,18 @@ impl Gas {
 
     /// Compute exception cost
     pub const fn load_cell_price(first: bool) -> i64 {
-        if first {CELL_LOAD_GAS_PRICE} else {CELL_RELOAD_GAS_PRICE}
+        if first {
+            CELL_LOAD_GAS_PRICE
+        } else {
+            CELL_RELOAD_GAS_PRICE
+        }
     }
     pub fn consume_load_cell(&mut self, first: bool) -> i64 {
-        self.use_gas(if first {CELL_LOAD_GAS_PRICE} else {CELL_RELOAD_GAS_PRICE})
+        self.use_gas(if first {
+            CELL_LOAD_GAS_PRICE
+        } else {
+            CELL_RELOAD_GAS_PRICE
+        })
     }
 
     /// Stack cost
@@ -159,7 +174,7 @@ impl Gas {
     }
     pub fn consume_stack(&mut self, stack_depth: usize) -> i64 {
         self.use_gas(
-            STACK_ENTRY_GAS_PRICE * (max(stack_depth, FREE_STACK_DEPTH) - FREE_STACK_DEPTH) as i64
+            STACK_ENTRY_GAS_PRICE * (max(stack_depth, FREE_STACK_DEPTH) - FREE_STACK_DEPTH) as i64,
         )
     }
 
@@ -182,10 +197,8 @@ impl Gas {
     #[cfg(feature = "gosh")]
     /// patch cost for diff
     pub fn diff_fee_for_count_patches(count: usize) -> i64 {
-        (
-            (count * count * DIFF_DURATION_FOR_COUNT_PATCHES * DIFF_DURATION_FOR_COUNT_PATCHES) / 
-            (DURATION_TO_GAS_COEFFICIENT as usize)
-        ) as i64
+        ((count * count * DIFF_DURATION_FOR_COUNT_PATCHES * DIFF_DURATION_FOR_COUNT_PATCHES)
+            / (DURATION_TO_GAS_COEFFICIENT as usize)) as i64
     }
 
     #[cfg(feature = "gosh")]
@@ -243,7 +256,11 @@ impl Gas {
         if self.gas_remaining >= 0 {
             Ok(None)
         } else {
-            Err(exception!(ExceptionCode::OutOfGas, self.gas_base - self.gas_remaining, "check_gas_remaining"))
+            Err(exception!(
+                ExceptionCode::OutOfGas,
+                self.gas_base - self.gas_remaining,
+                "check_gas_remaining"
+            ))
         }
     }
 

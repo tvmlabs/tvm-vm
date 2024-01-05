@@ -13,17 +13,22 @@
 
 use crate::{
     executor::{
-        serialize_currency_collection, engine::Engine, math::DivMode,
-        types::{Instruction, InstructionOptions}
+        engine::Engine,
+        math::DivMode,
+        serialize_currency_collection,
+        types::{Instruction, InstructionOptions},
     },
     stack::{
+        integer::{
+            behavior::{OperationBehavior, Quiet, Signaling},
+            IntegerData,
+        },
         Stack, StackItem,
-        integer::{IntegerData, behavior::{OperationBehavior, Signaling, Quiet}},
     },
-    types::Status
+    types::Status,
 };
 use std::collections::HashSet;
-use ton_types::{BuilderData, IBitstring, SliceData};
+use tvm_types::{BuilderData, IBitstring, SliceData};
 
 #[test]
 fn test_assert_stack() {
@@ -41,7 +46,9 @@ fn test_assert_stack() {
 #[test]
 fn test_next_cmd_failed() {
     let mut engine = Engine::with_capabilities(0);
-    engine.next_cmd().expect_err("Should be generated exception for empty code");
+    engine
+        .next_cmd()
+        .expect_err("Should be generated exception for empty code");
 }
 
 #[test]
@@ -72,14 +79,13 @@ fn test_division_primitives_execution() {
         if !mode.shift_parameter() {
             count += 1;
         }
-
     }
     assert_eq!(45, count);
 }
 
 fn get_command_name<T>(name: &str) -> String
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     let mut result = name.to_owned();
     if let Some(str) = T::name_prefix() {
@@ -90,12 +96,10 @@ where
 
 fn command_name_from_mode<T>(mode: &DivMode) -> String
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     match mode.command_name() {
-        Ok(name) => {
-            get_command_name::<T>(name)
-        },
+        Ok(name) => get_command_name::<T>(name),
         Err(_) => {
             panic!("Flags: {:#010b}, Cmd: <NOT IMPLEMENTED>", mode.flags)
         }
@@ -104,7 +108,7 @@ where
 
 fn test_div_primitive_execution<T>(mode: &DivMode)
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     let command_name = command_name_from_mode::<T>(mode);
     println!("Flags: {:#010b}, Cmd: {}", mode.flags, command_name);
@@ -121,33 +125,31 @@ where
     stack.push(int!(value));
 
     if mode.premultiply() && (!mode.mul_by_shift() || !mode.shift_parameter()) {
-        stack.push(int!(
-            if mode.mul_by_shift() {
-                swap = 1;
-                mul_shift
-            } else {
-                multiplier
-            }));
+        stack.push(int!(if mode.mul_by_shift() {
+            swap = 1;
+            mul_shift
+        } else {
+            multiplier
+        }));
     }
 
     if !(mode.div_by_shift() && mode.shift_parameter()) {
-        stack.push(int!(
-            if mode.div_by_shift() {
-                div_shift
-            } else {
-                if swap == 1 {
-                    swap = 2
-                }
-                divisor
-            }));
+        stack.push(int!(if mode.div_by_shift() {
+            div_shift
+        } else {
+            if swap == 1 {
+                swap = 2
+            }
+            divisor
+        }));
     }
     if swap == 2 {
         stack.swap(1, 0).unwrap()
     }
 
     let code = div_generate_bytecode::<T>(mode, mul_shift as u8, div_shift as u8);
-    let mut engine = Engine::with_capabilities(0)
-        .setup_with_libraries(code, None, Some(stack), None, vec![]);
+    let mut engine =
+        Engine::with_capabilities(0).setup_with_libraries(code, None, Some(stack), None, vec![]);
 
     match engine.execute() {
         Err(e) => panic!("Execute error: {}", e),
@@ -156,11 +158,12 @@ where
                 value *= multiplier
             }
 
-            let (expected_quotient, expected_remainder)
-                = IntegerData::from_i32(value).div::<T>(
-                &IntegerData::from_i32(divisor),
-                mode.rounding_strategy().unwrap()
-            ).unwrap();
+            let (expected_quotient, expected_remainder) = IntegerData::from_i32(value)
+                .div::<T>(
+                    &IntegerData::from_i32(divisor),
+                    mode.rounding_strategy().unwrap(),
+                )
+                .unwrap();
 
             if mode.need_remainder() {
                 let actual_remainder_si = engine.cc.stack.drop(0).unwrap();
@@ -179,7 +182,7 @@ where
 
 fn div_generate_bytecode<T>(mode: &DivMode, mul_shift: u8, div_shift: u8) -> SliceData
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     let mut res = Vec::<u8>::with_capacity(5);
     if T::quiet() {
@@ -211,12 +214,13 @@ fn test_slice(offset: usize, r: usize, x: usize) -> Status {
 
     let mut code = SliceData::load_builder(builder).unwrap();
     println!("offset: {}, r: {}, x: {}, code: {}", offset, r, x, code);
-    let mut engine = Engine::with_capabilities(0)
-        .setup_with_libraries(code.clone(), None, None, None, vec![]);
-    engine.load_instruction(
-        Instruction::new("PUSHCTR").set_opts(InstructionOptions::Bitstring(offset, r, x, 0))
-    ).unwrap();
-
+    let mut engine =
+        Engine::with_capabilities(0).setup_with_libraries(code.clone(), None, None, None, vec![]);
+    engine
+        .load_instruction(
+            Instruction::new("PUSHCTR").set_opts(InstructionOptions::Bitstring(offset, r, x, 0)),
+        )
+        .unwrap();
 
     let slice = engine.cmd.slice().clone();
     assert_eq!(engine.seek_next_cmd().unwrap(), None);
@@ -232,20 +236,19 @@ fn test_slice(offset: usize, r: usize, x: usize) -> Status {
 
 #[test]
 fn test_extract_slice() {
-    test_slice( 9, 2, 3).unwrap(); // STSLICECONST a command, x, r and data in the same byte
-    test_slice( 6, 0, 7).unwrap();
-    test_slice( 7, 2, 7).unwrap();
+    test_slice(9, 2, 3).unwrap(); // STSLICECONST a command, x, r and data in the same byte
+    test_slice(6, 0, 7).unwrap();
+    test_slice(7, 2, 7).unwrap();
     test_slice(12, 0, 4).unwrap();
-    test_slice( 8, 0, 4).unwrap();
-    test_slice( 8, 2, 5).unwrap();
-    test_slice( 0, 3, 7).unwrap();
+    test_slice(8, 0, 4).unwrap();
+    test_slice(8, 2, 5).unwrap();
+    test_slice(0, 3, 7).unwrap();
 
     for r in 0..4 {
         for x in 2..8 {
-            let min_offset = std::cmp::min(8, 16-r-x);
-            for offset in min_offset..16-r-x {
+            let min_offset = std::cmp::min(8, 16 - r - x);
+            for offset in min_offset..16 - r - x {
                 test_slice(offset, r, x).unwrap();
-
             }
         }
     }
@@ -257,4 +260,3 @@ fn test_currency_collection_ser() {
     let b2 = BuilderData::with_raw(vec![0x3b, 0xc6, 0x14, 0xe0], 29).unwrap();
     assert_eq!(b1, b2);
 }
-

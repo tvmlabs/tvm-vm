@@ -14,14 +14,15 @@
 use std::ops::AddAssign;
 
 use crate::stack::integer::{
-    IntegerData, IntegerValue, behavior::OperationBehavior,
+    behavior::OperationBehavior,
     utils::{
         binary_op, construct_double_nan, construct_single_nan, process_double_result,
-        process_single_result, unary_op
-    }
+        process_single_result, unary_op,
+    },
+    IntegerData, IntegerValue,
 };
 use num_traits::Zero;
-use ton_types::{Result, Status};
+use tvm_types::{Result, Status};
 
 // [x / y] -> (q, r)  :  q*y + r = x  :  |r| < |y|
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -39,7 +40,7 @@ impl IntegerData {
             self,
             |x| -x,
             construct_single_nan,
-            process_single_result::<T, _>
+            process_single_result::<T, _>,
         )
     }
 
@@ -49,7 +50,7 @@ impl IntegerData {
             other,
             |x, y| x + y,
             construct_single_nan,
-            process_single_result::<T, _>
+            process_single_result::<T, _>,
         )
     }
 
@@ -58,16 +59,16 @@ impl IntegerData {
             IntegerValue::NaN => {
                 on_nan_parameter!(T)?;
                 *self = construct_single_nan();
-                return Ok(())
-            },
+                return Ok(());
+            }
             IntegerValue::Value(ref mut v) => v,
         };
         let rhs = match other.value {
             IntegerValue::NaN => {
                 on_nan_parameter!(T)?;
                 *self = construct_single_nan();
-                return Ok(())
-            },
+                return Ok(());
+            }
             IntegerValue::Value(ref v) => v,
         };
         lhs.add_assign(rhs);
@@ -83,7 +84,7 @@ impl IntegerData {
             self,
             |x| x + other,
             construct_single_nan,
-            process_single_result::<T, _>
+            process_single_result::<T, _>,
         )
     }
 
@@ -93,7 +94,7 @@ impl IntegerData {
             other,
             |x, y| x - y,
             construct_single_nan,
-            process_single_result::<T, _>
+            process_single_result::<T, _>,
         )
     }
 
@@ -102,7 +103,7 @@ impl IntegerData {
             self,
             |x| x - other,
             construct_single_nan,
-            process_single_result::<T, _>
+            process_single_result::<T, _>,
         )
     }
 
@@ -112,7 +113,7 @@ impl IntegerData {
             other,
             |x, y| x * y,
             construct_single_nan,
-            process_single_result::<T, _>
+            process_single_result::<T, _>,
         )
     }
 
@@ -122,7 +123,7 @@ impl IntegerData {
             other,
             |x, y| (x * y) >> 256,
             construct_single_nan,
-            process_single_result::<T, _>
+            process_single_result::<T, _>,
         )
     }
 
@@ -131,13 +132,15 @@ impl IntegerData {
             self,
             |x| x * other,
             construct_single_nan,
-            process_single_result::<T, _>
+            process_single_result::<T, _>,
         )
     }
 
-    pub fn div<T: OperationBehavior>(&self, divisor: &IntegerData, rounding: Round)
-                                     -> Result<(IntegerData, IntegerData)>
-    {
+    pub fn div<T: OperationBehavior>(
+        &self,
+        divisor: &IntegerData,
+        rounding: Round,
+    ) -> Result<(IntegerData, IntegerData)> {
         let divisor = extract_value!(T, divisor, construct_double_nan);
         if divisor.is_zero() {
             on_integer_overflow!(T)?;
@@ -148,35 +151,35 @@ impl IntegerData {
             self,
             |dividend| utils::divmod(dividend, divisor, rounding),
             construct_double_nan,
-            process_double_result::<T, _>
+            process_double_result::<T, _>,
         )
     }
 
-    pub fn div_by_shift<T: OperationBehavior>(&self, shift: usize, rounding: Round)
-                                              -> Result<(IntegerData, IntegerData)>
-    {
+    pub fn div_by_shift<T: OperationBehavior>(
+        &self,
+        shift: usize,
+        rounding: Round,
+    ) -> Result<(IntegerData, IntegerData)> {
         unary_op::<T, _, _, _, _, _>(
             self,
             |dividend| utils::div_by_shift(dividend, shift, rounding),
             construct_double_nan,
-            process_double_result::<T, _>
+            process_double_result::<T, _>,
         )
     }
 }
 
 pub mod utils {
 
-    use crate::stack::integer::{Int, math::Round};
+    use crate::stack::integer::{math::Round, Int};
     use num_traits::{One, Signed, Zero};
     use std::cmp::Ordering;
 
     #[inline]
     pub fn divmod(dividend: &Int, divisor: &Int, rounding: Round) -> (Int, Int) {
         match rounding {
-            Round::FloorToNegativeInfinity =>
-                num::Integer::div_mod_floor(dividend, divisor),
-            Round::FloorToZero =>
-                num::Integer::div_rem(dividend, divisor),
+            Round::FloorToNegativeInfinity => num::Integer::div_mod_floor(dividend, divisor),
+            Round::FloorToZero => num::Integer::div_rem(dividend, divisor),
             Round::Ceil => {
                 let (mut quotient, mut remainder) = num::Integer::div_rem(dividend, divisor);
                 round_ceil(&mut quotient, &mut remainder, dividend, divisor);
@@ -201,14 +204,11 @@ pub mod utils {
             (dividend >> shift, dividend & &remainder_mask)
         };
         match rounding {
-            Round::FloorToNegativeInfinity =>
-                round_floor_to_negative_infinity(
-                    &mut quotient, &mut remainder, dividend, &divisor
-                ),
-            Round::Ceil =>
-                round_ceil(&mut quotient, &mut remainder, dividend, &divisor),
-            Round::Nearest =>
-                round_nearest(&mut quotient, &mut remainder, dividend, &divisor),
+            Round::FloorToNegativeInfinity => {
+                round_floor_to_negative_infinity(&mut quotient, &mut remainder, dividend, &divisor)
+            }
+            Round::Ceil => round_ceil(&mut quotient, &mut remainder, dividend, &divisor),
+            Round::Nearest => round_nearest(&mut quotient, &mut remainder, dividend, &divisor),
             _ => {}
         }
         (quotient, remainder)
@@ -234,12 +234,7 @@ pub mod utils {
     }
 
     #[inline]
-    fn round_ceil(
-        quotient: &mut Int,
-        remainder: &mut Int,
-        dividend: &Int,
-        divisor: &Int,
-    ) {
+    fn round_ceil(quotient: &mut Int, remainder: &mut Int, dividend: &Int, divisor: &Int) {
         if remainder.is_zero() || remainder.sign() != divisor.sign() {
             // No rounding needed
             return;
@@ -253,12 +248,7 @@ pub mod utils {
     }
 
     #[inline]
-    fn round_nearest(
-        quotient: &mut Int,
-        remainder: &mut Int,
-        dividend: &Int,
-        divisor: &Int,
-    ) {
+    fn round_nearest(quotient: &mut Int, remainder: &mut Int, dividend: &Int, divisor: &Int) {
         if remainder.is_zero() {
             // No rounding needed
             return;
@@ -270,9 +260,7 @@ pub mod utils {
         let r_x2: Int = remainder.clone() << 1;
         let cmp_result = r_x2.abs().cmp(&divisor.abs());
         let is_not_negative = dividend.sign() == divisor.sign();
-        if cmp_result == Ordering::Greater
-            || (cmp_result == Ordering::Equal && is_not_negative)
-        {
+        if cmp_result == Ordering::Greater || (cmp_result == Ordering::Equal && is_not_negative) {
             if divisor.sign() == remainder.sign() {
                 *remainder -= divisor;
             } else {

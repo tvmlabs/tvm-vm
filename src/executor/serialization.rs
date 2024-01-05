@@ -14,39 +14,44 @@
 use crate::{
     error::TvmError,
     executor::{
-    	Mask, engine::{Engine, data::convert, storage::{fetch_stack, fetch_reference}},
-        gas::gas_state::Gas, microcode::{BUILDER, CC, CELL, VAR},
-        types::{InstructionOptions, Instruction}
+        engine::{
+            data::convert,
+            storage::{fetch_reference, fetch_stack},
+            Engine,
+        },
+        gas::gas_state::Gas,
+        microcode::{BUILDER, CC, CELL, VAR},
+        types::{Instruction, InstructionOptions},
+        Mask,
     },
     stack::{
-        StackItem,
         integer::{
-            IntegerData,
             serialization::{
-                Encoding, SignedIntegerBigEndianEncoding,
-                SignedIntegerLittleEndianEncoding, UnsignedIntegerBigEndianEncoding,
-                UnsignedIntegerLittleEndianEncoding
-            }
-        }
+                Encoding, SignedIntegerBigEndianEncoding, SignedIntegerLittleEndianEncoding,
+                UnsignedIntegerBigEndianEncoding, UnsignedIntegerLittleEndianEncoding,
+            },
+            IntegerData,
+        },
+        StackItem,
     },
-    types::{Exception, Status}
+    types::{Exception, Status},
 };
-use ton_types::{BuilderData, CellType, GasConsumer, error, IBitstring, Result, ExceptionCode, MAX_LEVEL};
+use tvm_types::{
+    error, BuilderData, CellType, ExceptionCode, GasConsumer, IBitstring, Result, MAX_LEVEL,
+};
 
 const QUIET: u8 = 0x01; // quiet variant
 const STACK: u8 = 0x02; // length of int in stack
-const CMD:   u8 = 0x04; // length of int in cmd parameter
-const BITS:  u8 = 0x08; // check bits
-const REFS:  u8 = 0x10; // check refs
-const INV:   u8 = 0x20; // Remain free in builder
+const CMD: u8 = 0x04; // length of int in cmd parameter
+const BITS: u8 = 0x08; // check bits
+const REFS: u8 = 0x10; // check refs
+const INV: u8 = 0x20; // Remain free in builder
 
 // Cell serialization related instructions ************************************
 
 // used of free bits or/and refs in builder
 fn size_b(engine: &mut Engine, name: &'static str, how: u8) -> Status {
-    engine.load_instruction(
-        Instruction::new(name)
-    )?;
+    engine.load_instruction(Instruction::new(name))?;
     fetch_stack(engine, 1)?;
     match engine.cmd.var(0).as_builder()? {
         b if how.bit(INV) => {
@@ -101,9 +106,7 @@ pub fn execute_brembitrefs(engine: &mut Engine) -> Status {
 
 // (builder - cell)
 pub fn execute_endc(engine: &mut Engine) -> Status {
-    engine.load_instruction(
-        Instruction::new("ENDC")
-    )?;
+    engine.load_instruction(Instruction::new("ENDC"))?;
     fetch_stack(engine, 1)?;
     convert(engine, var!(0), CELL, BUILDER)?;
     engine.cc.stack.push(engine.cmd.vars.remove(0));
@@ -112,20 +115,21 @@ pub fn execute_endc(engine: &mut Engine) -> Status {
 
 // (builder x - cell)
 pub fn execute_endxc(engine: &mut Engine) -> Status {
-    engine.load_instruction(
-        Instruction::new("ENDXC")
-    )?;
+    engine.load_instruction(Instruction::new("ENDXC"))?;
     fetch_stack(engine, 2)?;
     let special = engine.cmd.var(0).as_bool()?;
     let mut b = engine.cmd.var_mut(1).as_builder_mut()?;
     if special {
         if b.length_in_bits() < 8 {
             engine.use_gas(Gas::finalize_price());
-            return err!(ExceptionCode::CellOverflow, "Not enough data for a special cell")
+            return err!(
+                ExceptionCode::CellOverflow,
+                "Not enough data for a special cell"
+            );
         }
         match CellType::try_from(b.data()[0]) {
             Ok(cell_type) => b.set_type(cell_type),
-            Err(err) => return err!(ExceptionCode::CellOverflow, "{}", err)
+            Err(err) => return err!(ExceptionCode::CellOverflow, "{}", err),
         }
     }
     let cell = engine.finalize_cell(b)?;
@@ -135,15 +139,19 @@ pub fn execute_endxc(engine: &mut Engine) -> Status {
 
 // ( - builder)
 pub fn execute_newc(engine: &mut Engine) -> Status {
-    engine.load_instruction(
-        Instruction::new("NEWC")
-    )?;
+    engine.load_instruction(Instruction::new("NEWC"))?;
     engine.cc.stack.push_builder(BuilderData::new());
     Ok(())
 }
 
 // store data from one builder to another
-fn store_data(engine: &mut Engine, var: usize, x: Result<BuilderData>, quiet: bool, finalize: bool) -> Status {
+fn store_data(
+    engine: &mut Engine,
+    var: usize,
+    x: Result<BuilderData>,
+    quiet: bool,
+    finalize: bool,
+) -> Status {
     let result = match x {
         Ok(x) => {
             let b = engine.cmd.var(var).as_builder()?;
@@ -158,11 +166,11 @@ fn store_data(engine: &mut Engine, var: usize, x: Result<BuilderData>, quiet: bo
             } else if quiet {
                 -1
             } else {
-                return err!(ExceptionCode::CellOverflow)
+                return err!(ExceptionCode::CellOverflow);
             }
         }
         Err(_) if quiet => 1,
-        Err(err) => return Err(err)
+        Err(err) => return Err(err),
     };
     if result != 0 {
         let len = engine.cmd.var_count();
@@ -177,9 +185,7 @@ fn store_data(engine: &mut Engine, var: usize, x: Result<BuilderData>, quiet: bo
 
 // stores data from one builder ot another
 fn store_b(engine: &mut Engine, name: &'static str, how: u8) -> Status {
-    engine.load_instruction(
-        Instruction::new(name)
-    )?;
+    engine.load_instruction(Instruction::new(name))?;
     fetch_stack(engine, 2)?;
     let x;
     let b = if how.bit(INV) {
@@ -217,9 +223,7 @@ pub fn execute_stbrq(engine: &mut Engine) -> Status {
 
 // appends the cell as a reference to the builder
 fn store_r(engine: &mut Engine, name: &'static str, how: u8) -> Status {
-    engine.load_instruction(
-        Instruction::new(name)
-    )?;
+    engine.load_instruction(Instruction::new(name))?;
     fetch_stack(engine, 2)?;
     let x;
     let b = if how.bit(INV) {
@@ -257,9 +261,7 @@ pub fn execute_strefrq(engine: &mut Engine) -> Status {
 
 // store one builder to another as reference
 fn store_br(engine: &mut Engine, name: &'static str, how: u8) -> Status {
-    engine.load_instruction(
-        Instruction::new(name)
-    )?;
+    engine.load_instruction(Instruction::new(name))?;
     fetch_stack(engine, 2)?;
     let x;
     let b = if how.bit(INV) {
@@ -296,9 +298,7 @@ pub fn execute_stbrefrq(engine: &mut Engine) -> Status {
 }
 
 fn store_s(engine: &mut Engine, name: &'static str, how: u8) -> Status {
-    engine.load_instruction(
-        Instruction::new(name)
-    )?;
+    engine.load_instruction(Instruction::new(name))?;
     fetch_stack(engine, 2)?;
     let x;
     let b = if how.bit(INV) {
@@ -316,14 +316,12 @@ fn store_s(engine: &mut Engine, name: &'static str, how: u8) -> Status {
 
 // (D b - b')
 pub(crate) fn execute_stdict(engine: &mut Engine) -> Status {
-    engine.load_instruction(
-        Instruction::new("STDICT")
-    )?;
+    engine.load_instruction(Instruction::new("STDICT"))?;
     fetch_stack(engine, 2)?;
     engine.cmd.var(0).as_builder()?;
     let x = match engine.cmd.var(1).as_dict()? {
         Some(x) => BuilderData::with_raw_and_refs(vec![0xC0], 1, vec![x.clone()]),
-        None => BuilderData::with_raw(vec![0x40], 1)
+        None => BuilderData::with_raw(vec![0x40], 1),
     };
     store_data(engine, 0, x, false, false)
 }
@@ -351,8 +349,12 @@ pub fn execute_stslicerq(engine: &mut Engine) -> Status {
 fn check_b(engine: &mut Engine, name: &'static str, how: u8) -> Status {
     let mut instruction = Instruction::new(name);
     let mut params = 1;
-    if how.bit(BITS) {params += 1}
-    if how.bit(REFS) {params += 1}
+    if how.bit(BITS) {
+        params += 1
+    }
+    if how.bit(REFS) {
+        params += 1
+    }
     if how.bit(CMD) {
         params -= 1;
         instruction = instruction.set_opts(InstructionOptions::LengthMinusOne(0..256))
@@ -383,7 +385,7 @@ fn check_b(engine: &mut Engine, name: &'static str, how: u8) -> Status {
     if how.bit(QUIET) {
         engine.cc.stack.push(boolean!(status));
     } else if !status {
-        return err!(ExceptionCode::CellOverflow)
+        return err!(ExceptionCode::CellOverflow);
     }
     Ok(())
 }
@@ -422,7 +424,7 @@ pub fn execute_bchkbitsq_long(engine: &mut Engine) -> Status {
 
 fn store<T: Encoding>(engine: &mut Engine, name: &'static str, how: u8) -> Status {
     engine.load_instruction(
-        Instruction::new(name).set_opts(InstructionOptions::LengthMinusOne(0..256))
+        Instruction::new(name).set_opts(InstructionOptions::LengthMinusOne(0..256)),
     )?;
     fetch_stack(engine, 2)?;
     let len = engine.cmd.length();
@@ -480,9 +482,7 @@ pub fn execute_sturq(engine: &mut Engine) -> Status {
 }
 
 fn store_x<T: Encoding>(engine: &mut Engine, name: &'static str, how: u8, limit: usize) -> Status {
-    engine.load_instruction(
-        Instruction::new(name)
-    )?;
+    engine.load_instruction(Instruction::new(name))?;
     fetch_stack(engine, 3)?;
     let len = engine.cmd.var(0).as_integer()?;
     let x;
@@ -542,9 +542,7 @@ pub fn execute_stuxrq(engine: &mut Engine) -> Status {
 
 // stores the integer to the builder in little-endian order
 fn store_l<T: Encoding>(engine: &mut Engine, name: &'static str, bits: usize) -> Status {
-    engine.load_instruction(
-        Instruction::new(name)
-    )?;
+    engine.load_instruction(Instruction::new(name))?;
     fetch_stack(engine, 2)?;
     engine.cmd.var(0).as_builder()?;
     let x = engine.cmd.var(1).as_integer()?.as_builder::<T>(bits);
@@ -573,15 +571,13 @@ pub fn execute_stule8(engine: &mut Engine) -> Status {
 
 fn store_bits(mut builder: BuilderData, n: usize, bit: bool) -> Result<BuilderData> {
     if n != 0 {
-        builder.append_raw(vec![if bit {0xFF} else {0}; n / 8 + 1].as_slice(), n)?;
+        builder.append_raw(vec![if bit { 0xFF } else { 0 }; n / 8 + 1].as_slice(), n)?;
     }
     Ok(builder)
 }
 
 fn stbits(engine: &mut Engine, name: &'static str, bit: bool) -> Status {
-    engine.load_instruction(
-        Instruction::new(name)
-    )?;
+    engine.load_instruction(Instruction::new(name))?;
     fetch_stack(engine, 2)?;
     let n = engine.cmd.var(0).as_integer()?;
     engine.cmd.var(1).as_builder()?;
@@ -602,9 +598,7 @@ pub fn execute_stones(engine: &mut Engine) -> Status {
 }
 
 pub fn execute_stsame(engine: &mut Engine) -> Status {
-    engine.load_instruction(
-        Instruction::new("STSAME")
-    )?;
+    engine.load_instruction(Instruction::new("STSAME"))?;
     fetch_stack(engine, 3)?;
     let x = engine.cmd.var(0).as_integer()?;
     let n = engine.cmd.var(1).as_integer()?;
@@ -618,7 +612,7 @@ pub fn execute_stsame(engine: &mut Engine) -> Status {
 
 pub fn execute_stsliceconst(engine: &mut Engine) -> Status {
     engine.load_instruction(
-        Instruction::new("STSLICECONST").set_opts(InstructionOptions::Bitstring(9, 2, 3, 0))
+        Instruction::new("STSLICECONST").set_opts(InstructionOptions::Bitstring(9, 2, 3, 0)),
     )?;
     fetch_stack(engine, 1)?;
     let mut builder = engine.cmd.var_mut(0).as_builder_mut()?;
@@ -629,9 +623,7 @@ pub fn execute_stsliceconst(engine: &mut Engine) -> Status {
 }
 
 pub fn execute_strefconst(engine: &mut Engine) -> Status {
-    engine.load_instruction(
-        Instruction::new("STREFCONST")
-    )?;
+    engine.load_instruction(Instruction::new("STREFCONST"))?;
     fetch_reference(engine, CC)?;
     fetch_stack(engine, 1)?;
     let mut b = {
@@ -644,9 +636,7 @@ pub fn execute_strefconst(engine: &mut Engine) -> Status {
 }
 
 pub fn execute_stref2const(engine: &mut Engine) -> Status {
-    engine.load_instruction(
-        Instruction::new("STREF2CONST")
-    )?;
+    engine.load_instruction(Instruction::new("STREF2CONST"))?;
     fetch_reference(engine, CC)?;
     fetch_reference(engine, CC)?;
     fetch_stack(engine, 1)?;
@@ -682,7 +672,9 @@ pub fn execute_cdepth(engine: &mut Engine) -> Status {
         0
     } else {
         let c = engine.cmd.var(0).as_cell()?;
-        if !engine.check_capabilities(ton_block::GlobalCapabilities::CapResolveMerkleCell as u64) && c.references_count() == 0 {
+        if !engine.check_capabilities(tvm_block::GlobalCapabilities::CapResolveMerkleCell as u64)
+            && c.references_count() == 0
+        {
             0
         } else {
             c.depth(MAX_LEVEL)
@@ -713,12 +705,13 @@ pub fn execute_stcont(engine: &mut Engine) -> Status {
     engine.cmd.var(0).as_builder()?;
     engine.cmd.var(1).as_continuation()?;
     let cont = engine.cmd.var_mut(1).withdraw();
-    let cont = if engine.check_capabilities(ton_block::GlobalCapabilities::CapStcontNewFormat as u64) {
-        cont.as_continuation()?.serialize(engine)?
-    } else {
-        let (cont, gas) = cont.as_continuation()?.serialize_old()?;
-        engine.use_gas(gas);
-        cont
-    };
+    let cont =
+        if engine.check_capabilities(tvm_block::GlobalCapabilities::CapStcontNewFormat as u64) {
+            cont.as_continuation()?.serialize(engine)?
+        } else {
+            let (cont, gas) = cont.as_continuation()?.serialize_old()?;
+            engine.use_gas(gas);
+            cont
+        };
     store_data(engine, 0, Ok(cont), false, false)
 }

@@ -17,29 +17,29 @@ mod microcode;
 mod engine;
 mod accounts;
 mod blockchain;
-mod serialization;
-mod deserialization;
+mod config;
 mod continuation;
 mod crypto;
 mod currency;
+mod deserialization;
 mod dictionary;
+#[cfg(feature = "gosh")]
+mod diff;
+mod dump;
 mod exceptions;
+pub mod gas;
 mod globals;
 mod math;
+mod null;
+mod rand;
+mod serialization;
 mod slice_comparison;
 mod stack;
 mod tuple;
 mod types;
-pub mod gas;
-mod dump;
-mod null;
-mod config;
-mod rand;
-#[cfg(feature = "gosh")]
-mod diff;
 
 pub use engine::*;
-use ton_types::{BuilderData, Cell, IBitstring, Result};
+use tvm_types::{BuilderData, Cell, IBitstring, Result};
 
 #[cfg(test)]
 #[path = "../tests/test_executor.rs"]
@@ -68,7 +68,7 @@ impl Mask for u8 {
 
 fn serialize_grams(grams: u128) -> Result<BuilderData> {
     let bytes = 16 - grams.leading_zeros() as usize / 8;
-    let mut builder = BuilderData::with_raw(vec!((bytes as u8) << 4), 4)?;
+    let mut builder = BuilderData::with_raw(vec![(bytes as u8) << 4], 4)?;
     builder.append_raw(&grams.to_be_bytes()[16 - bytes..], bytes * 8)?;
     Ok(builder)
 }

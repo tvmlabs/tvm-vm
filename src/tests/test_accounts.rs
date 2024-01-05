@@ -12,12 +12,12 @@
 */
 
 use crate::executor::accounts::{
-    SimpleAddress, SortedList, StakeAndFactor, Validator, ValidatorKey
+    SimpleAddress, SortedList, StakeAndFactor, Validator, ValidatorKey,
 };
 use num::BigUint;
 use rand::{prelude::SliceRandom, thread_rng};
-use ton_block::Grams;
-use ton_types::UInt256;
+use tvm_block::Grams;
+use tvm_types::UInt256;
 
 impl Validator {
     fn with_stake(stake: u64) -> Validator {
@@ -113,4 +113,3 @@ fn test_sorted_validator_list() {
         assert_eq!(!(i as u8), validator.key.pub_key.as_slice()[0]);
     }
 }
-

@@ -28,11 +28,11 @@ use crate::{
     types::{Exception, Status},
 };
 use num::{bigint::Sign, BigInt};
-use ton_block::{
+use tvm_block::{
     Deserializable, GlobalCapabilities, MsgAddressInt, ACTION_CHANGE_LIB, ACTION_COPYLEFT,
     ACTION_RESERVE, ACTION_SEND_MSG, ACTION_SET_CODE,
 };
-use ton_types::{
+use tvm_types::{
     error, types::ExceptionCode, BuilderData, Cell, GasConsumer, IBitstring, Result, SliceData,
 };
 
@@ -47,10 +47,14 @@ fn get_bigint(slice: &SliceData) -> BigInt {
     }
 }
 
-
 // Blockchain related instructions ********************************************
 
-fn add_action(engine: &mut Engine, action_id: u32, cell: Option<Cell>, suffix: BuilderData) -> Status {
+fn add_action(
+    engine: &mut Engine,
+    action_id: u32,
+    cell: Option<Cell>,
+    suffix: BuilderData,
+) -> Status {
     let mut new_action = BuilderData::new();
     let c5 = engine.ctrls.get(5).ok_or(ExceptionCode::TypeCheckError)?;
     new_action.checked_append_reference(c5.as_cell()?.clone())?;
@@ -69,7 +73,11 @@ pub(super) fn execute_changelib(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("CHANGELIB"))?;
     fetch_stack(engine, 2)?;
     let x = engine.cmd.var(0).as_integer()?.into(0..=2)? as u8;
-    let hash = engine.cmd.var(1).as_integer()?.as_builder::<UnsignedIntegerBigEndianEncoding>(256)?;
+    let hash = engine
+        .cmd
+        .var(1)
+        .as_integer()?
+        .as_builder::<UnsignedIntegerBigEndianEncoding>(256)?;
     let mut suffix = BuilderData::with_raw(vec![x * 2], 8)?;
     suffix.append_builder(&hash)?;
     add_action(engine, ACTION_CHANGE_LIB, None, suffix)
@@ -101,7 +109,12 @@ pub(super) fn execute_setlibcode(engine: &mut Engine) -> Status {
     fetch_stack(engine, 2)?;
     let x = engine.cmd.var(0).as_integer()?.into(0..=2)? as u8;
     let cell = engine.cmd.var(1).as_cell()?.clone();
-    add_action(engine, ACTION_CHANGE_LIB, Some(cell), BuilderData::with_raw(vec![x * 2 + 1], 8)?)
+    add_action(
+        engine,
+        ACTION_CHANGE_LIB,
+        Some(cell),
+        BuilderData::with_raw(vec![x * 2 + 1], 8)?,
+    )
 }
 
 /// COPYLEFT (s n - )
@@ -153,9 +166,11 @@ pub(super) fn execute_rawreservex(engine: &mut Engine) -> Status {
 }
 
 pub(super) fn execute_ldmsgaddr<T: OperationBehavior>(engine: &mut Engine) -> Status {
-    engine.load_instruction(
-        Instruction::new(if T::quiet() {"LDMSGADDRQ"} else {"LDMSGADDR"})
-    )?;
+    engine.load_instruction(Instruction::new(if T::quiet() {
+        "LDMSGADDRQ"
+    } else {
+        "LDMSGADDR"
+    }))?;
     fetch_stack(engine, 1)?;
     let mut slice = engine.cmd.var(0).as_slice()?.clone();
     let mut remainder = slice.clone();
@@ -178,14 +193,19 @@ pub(super) fn execute_ldmsgaddr<T: OperationBehavior>(engine: &mut Engine) -> St
 }
 
 fn load_address<F, T>(engine: &mut Engine, name: &'static str, op: F) -> Status
-where F: FnOnce(Vec<StackItem>, &mut dyn GasConsumer) -> Result<Vec<StackItem>>, T: OperationBehavior {
+where
+    F: FnOnce(Vec<StackItem>, &mut dyn GasConsumer) -> Result<Vec<StackItem>>,
+    T: OperationBehavior,
+{
     engine.load_instruction(Instruction::new(name))?;
     fetch_stack(engine, 1)?;
     let mut slice = engine.cmd.var(0).as_slice()?.clone();
     let mut result = false;
     if let Ok(addr) = parse_address(&mut slice) {
         if let Ok(mut stack) = op(addr, engine) {
-            stack.drain(..).for_each(|var| {engine.cc.stack.push(var);});
+            stack.drain(..).for_each(|var| {
+                engine.cc.stack.push(var);
+            });
             result = true;
         }
     }
@@ -200,61 +220,83 @@ where F: FnOnce(Vec<StackItem>, &mut dyn GasConsumer) -> Result<Vec<StackItem>>,
 }
 
 pub(super) fn execute_parsemsgaddr<T: OperationBehavior>(engine: &mut Engine) -> Status {
-    load_address::<_, T>(engine, if T::quiet() {"PARSEMSGADDRQ"} else {"PARSEMSGADDR"},
-        |tuple, _| Ok(vec![StackItem::tuple(tuple)])
+    load_address::<_, T>(
+        engine,
+        if T::quiet() {
+            "PARSEMSGADDRQ"
+        } else {
+            "PARSEMSGADDR"
+        },
+        |tuple, _| Ok(vec![StackItem::tuple(tuple)]),
     )
 }
 
 // (s - x y) compose rewrite_pfx and address to a 256 bit integer
 pub(super) fn execute_rewrite_std_addr<T: OperationBehavior>(engine: &mut Engine) -> Status {
-    load_address::<_, T>(engine, if T::quiet() {"REWRITESTDADDRQ"} else {"REWRITESTDADDR"}, |tuple, _| {
-        if tuple.len() == 4 {
-            let addr = tuple[3].as_slice()?;
-            let mut y = match addr.remaining_bits() {
-                256 => IntegerData::from(get_bigint(addr))?,
-                _ => return err!(ExceptionCode::CellUnderflow)
-            };
-            if tuple[1].is_slice() {
-                let rewrite_pfx = tuple[1].as_slice()?;
-                let bits = rewrite_pfx.remaining_bits();
-                if bits > 256 {
-                    return err!(ExceptionCode::CellUnderflow)
-                } else if bits > 0 {
-                    let prefix = IntegerData::from(get_bigint(rewrite_pfx))?;
-                    let mask = IntegerData::mask(256 - bits);
-                    y = y.and::<T>(&mask)?.or::<T>(&prefix)?;
-                }
-            };
-            let x = tuple[2].clone();
-            Ok(vec![x, StackItem::int(y)])
+    load_address::<_, T>(
+        engine,
+        if T::quiet() {
+            "REWRITESTDADDRQ"
         } else {
-            err!(ExceptionCode::CellUnderflow)
-        }
-    })
+            "REWRITESTDADDR"
+        },
+        |tuple, _| {
+            if tuple.len() == 4 {
+                let addr = tuple[3].as_slice()?;
+                let mut y = match addr.remaining_bits() {
+                    256 => IntegerData::from(get_bigint(addr))?,
+                    _ => return err!(ExceptionCode::CellUnderflow),
+                };
+                if tuple[1].is_slice() {
+                    let rewrite_pfx = tuple[1].as_slice()?;
+                    let bits = rewrite_pfx.remaining_bits();
+                    if bits > 256 {
+                        return err!(ExceptionCode::CellUnderflow);
+                    } else if bits > 0 {
+                        let prefix = IntegerData::from(get_bigint(rewrite_pfx))?;
+                        let mask = IntegerData::mask(256 - bits);
+                        y = y.and::<T>(&mask)?.or::<T>(&prefix)?;
+                    }
+                };
+                let x = tuple[2].clone();
+                Ok(vec![x, StackItem::int(y)])
+            } else {
+                err!(ExceptionCode::CellUnderflow)
+            }
+        },
+    )
 }
 
 // (s - x s') compose rewrite_pfx and address to a slice
 pub(super) fn execute_rewrite_var_addr<T: OperationBehavior>(engine: &mut Engine) -> Status {
-    load_address::<_, T>(engine, if T::quiet() {"REWRITEVARADDRQ"} else {"REWRITEVARADDR"}, |tuple, gas_consumer| {
-        if tuple.len() == 4 {
-            let mut addr = tuple[3].as_slice()?.clone();
-            if let Ok(rewrite_pfx) = tuple[1].as_slice() {
-                let bits = rewrite_pfx.remaining_bits();
-                if bits > addr.remaining_bits() {
-                    return err!(ExceptionCode::CellUnderflow)
-                } else if bits > 0 {
-                    let mut b = rewrite_pfx.as_builder();
-                    addr.shrink_data(bits..);
-                    b.append_bytestring(&addr)?;
-                    addr = gas_consumer.finalize_cell_and_load(b)?;
-                }
-            };
-            let x = tuple[2].clone();
-            Ok(vec![x, StackItem::Slice(addr)])
+    load_address::<_, T>(
+        engine,
+        if T::quiet() {
+            "REWRITEVARADDRQ"
         } else {
-            err!(ExceptionCode::CellUnderflow)
-        }
-    })
+            "REWRITEVARADDR"
+        },
+        |tuple, gas_consumer| {
+            if tuple.len() == 4 {
+                let mut addr = tuple[3].as_slice()?.clone();
+                if let Ok(rewrite_pfx) = tuple[1].as_slice() {
+                    let bits = rewrite_pfx.remaining_bits();
+                    if bits > addr.remaining_bits() {
+                        return err!(ExceptionCode::CellUnderflow);
+                    } else if bits > 0 {
+                        let mut b = rewrite_pfx.as_builder();
+                        addr.shrink_data(bits..);
+                        b.append_bytestring(&addr)?;
+                        addr = gas_consumer.finalize_cell_and_load(b)?;
+                    }
+                };
+                let x = tuple[2].clone();
+                Ok(vec![x, StackItem::Slice(addr)])
+            } else {
+                err!(ExceptionCode::CellUnderflow)
+            }
+        },
+    )
 }
 
 fn read_rewrite_pfx(cell: &mut SliceData) -> Result<Option<SliceData>> {
@@ -263,13 +305,13 @@ fn read_rewrite_pfx(cell: &mut SliceData) -> Result<Option<SliceData>> {
             let len = cell.get_next_int(5)?;
             Ok(Some(cell.get_next_slice(len as usize)?))
         }
-        false => Ok(None)
+        false => Ok(None),
     }
 }
 
 fn parse_address(cell: &mut SliceData) -> Result<Vec<StackItem>> {
     let addr_type = cell.get_next_int(2)? as u8;
-    let mut tuple = vec!(int!(addr_type));
+    let mut tuple = vec![int!(addr_type)];
     match addr_type & 0b11 {
         0b00 => (),
         0b01 => {
@@ -279,7 +321,7 @@ fn parse_address(cell: &mut SliceData) -> Result<Vec<StackItem>> {
         0b10 => {
             tuple.push(match read_rewrite_pfx(cell)? {
                 Some(slice) => StackItem::Slice(slice),
-                None => StackItem::None
+                None => StackItem::None,
             });
             tuple.push(int!(cell.get_next_byte()? as i8));
             tuple.push(StackItem::Slice(cell.get_next_slice(256)?));
@@ -287,13 +329,13 @@ fn parse_address(cell: &mut SliceData) -> Result<Vec<StackItem>> {
         0b11 => {
             tuple.push(match read_rewrite_pfx(cell)? {
                 Some(slice) => StackItem::Slice(slice),
-                None => StackItem::None
+                None => StackItem::None,
             });
             let len = cell.get_next_int(9)?;
             tuple.push(int!(cell.get_next_i32()?));
             tuple.push(StackItem::Slice(cell.get_next_slice(len as usize)?));
         }
-        _ => ()
+        _ => (),
     }
     Ok(tuple)
 }

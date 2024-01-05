@@ -13,12 +13,15 @@
 
 use crate::{
     error::TvmError,
-    executor::{engine::{Engine, storage::fetch_stack}, types::Instruction},
-    stack::{StackItem, integer::IntegerData},
-    types::{Exception, Status}
+    executor::{
+        engine::{storage::fetch_stack, Engine},
+        types::Instruction,
+    },
+    stack::{integer::IntegerData, StackItem},
+    types::{Exception, Status},
 };
-use ton_block::GlobalCapabilities;
-use ton_types::{BuilderData, error, IBitstring, types::ExceptionCode};
+use tvm_block::GlobalCapabilities;
+use tvm_types::{error, types::ExceptionCode, BuilderData, IBitstring};
 
 // slice - uint slice'
 fn load_var(engine: &mut Engine, name: &'static str, max_bytes: u8, sign: bool) -> Status {
@@ -30,7 +33,7 @@ fn load_var(engine: &mut Engine, name: &'static str, max_bytes: u8, sign: bool) 
     let vec = slice.get_next_bytes(bytes)?;
     let value = match sign {
         true => num::BigInt::from_signed_bytes_be(&vec),
-        false => num::BigInt::from_bytes_be(num::bigint::Sign::Plus, &vec)
+        false => num::BigInt::from_bytes_be(num::bigint::Sign::Plus, &vec),
     };
     engine.cc.stack.push(int!(value));
     engine.cc.stack.push(StackItem::Slice(slice));
@@ -64,23 +67,28 @@ fn store_var(engine: &mut Engine, name: &'static str, max_bits: usize, sign: boo
             x.check_neg()?;
             (x.ubitsize()?, x.take_value_of(|x| Some(x.to_bytes_be().1))?)
         }
-        true => (x.bitsize()?, x.take_value_of(|x| Some(x.to_signed_bytes_be()))?)
+        true => (
+            x.bitsize()?,
+            x.take_value_of(|x| Some(x.to_signed_bytes_be()))?,
+        ),
     };
     if bits > max_bits {
-        return err!(ExceptionCode::RangeCheckError, "{} has {} bits, but max is {}", x, bits, max_bits)
+        return err!(
+            ExceptionCode::RangeCheckError,
+            "{} has {} bits, but max is {}",
+            x,
+            bits,
+            max_bits
+        );
     }
     let len = 16 - (max_bits as u16 / 8).leading_zeros();
     match max_bits {
         120 => debug_assert_eq!(len, 4),
         248 => debug_assert_eq!(len, 5),
-        _ => debug_assert_eq!(len, 0)
+        _ => debug_assert_eq!(len, 0),
     }
     let mut x = BuilderData::new();
-    let bytes = if bits != 0 {
-        vec.len()
-    } else {
-        0
-    };
+    let bytes = if bits != 0 { vec.len() } else { 0 };
     x.append_bits(bytes, len as usize)?;
     x.append_raw(&vec, bytes * 8)?;
     if b.can_append(&x) {

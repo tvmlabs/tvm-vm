@@ -14,26 +14,24 @@
 use crate::{
     error::TvmError,
     executor::{
-        engine::{Engine, storage::fetch_stack}, types::Instruction
+        engine::{storage::fetch_stack, Engine},
+        types::Instruction,
     },
     stack::{
+        integer::{serialization::UnsignedIntegerBigEndianEncoding, IntegerData},
         StackItem,
-        integer::{
-            IntegerData,
-            serialization::UnsignedIntegerBigEndianEncoding
-        },
     },
-    types::{Exception, Status}
+    types::{Exception, Status},
 };
 use ed25519::signature::Verifier;
 use std::borrow::Cow;
-use ton_block::GlobalCapabilities;
-use ton_types::{BuilderData, error, GasConsumer, ExceptionCode, UInt256};
+use tvm_block::GlobalCapabilities;
+use tvm_types::{error, BuilderData, ExceptionCode, GasConsumer, UInt256};
 
-const PUBLIC_KEY_BITS:  usize = PUBLIC_KEY_BYTES * 8;
-const SIGNATURE_BITS:   usize = SIGNATURE_BYTES * 8;
+const PUBLIC_KEY_BITS: usize = PUBLIC_KEY_BYTES * 8;
+const SIGNATURE_BITS: usize = SIGNATURE_BYTES * 8;
 const PUBLIC_KEY_BYTES: usize = ed25519_dalek::PUBLIC_KEY_LENGTH;
-const SIGNATURE_BYTES:  usize = ed25519_dalek::SIGNATURE_LENGTH;
+const SIGNATURE_BYTES: usize = ed25519_dalek::SIGNATURE_LENGTH;
 
 fn hash_to_uint(bits: impl AsRef<[u8]>) -> IntegerData {
     IntegerData::from_unsigned_bytes_be(bits)
@@ -82,14 +80,14 @@ pub(super) fn execute_sha256u(engine: &mut Engine) -> Status {
 
 enum DataForSignature {
     Hash(BuilderData),
-    Slice(Vec<u8>)
+    Slice(Vec<u8>),
 }
 
 impl AsRef<[u8]> for DataForSignature {
     fn as_ref(&self) -> &[u8] {
         match self {
             DataForSignature::Hash(hash) => hash.data(),
-            DataForSignature::Slice(slice) => slice.as_slice()
+            DataForSignature::Slice(slice) => slice.as_slice(),
         }
     }
 }
@@ -100,7 +98,7 @@ fn preprocess_signed_data<'a>(_engine: &Engine, data: &'a [u8]) -> Cow<'a, [u8]>
         let mut extended_data = Vec::with_capacity(4 + data.len());
         extended_data.extend_from_slice(&_engine.signature_id().to_be_bytes());
         extended_data.extend_from_slice(data);
-        return Cow::Owned(extended_data)
+        return Cow::Owned(extended_data);
     }
     Cow::Borrowed(data)
 }
@@ -108,7 +106,10 @@ fn preprocess_signed_data<'a>(_engine: &Engine, data: &'a [u8]) -> Cow<'a, [u8]>
 fn check_signature(engine: &mut Engine, name: &'static str, hash: bool) -> Status {
     engine.load_instruction(Instruction::new(name))?;
     fetch_stack(engine, 3)?;
-    let pub_key = engine.cmd.var(0).as_integer()?
+    let pub_key = engine
+        .cmd
+        .var(0)
+        .as_integer()?
         .as_builder::<UnsignedIntegerBigEndianEncoding>(PUBLIC_KEY_BITS)?;
     engine.cmd.var(1).as_slice()?;
     if hash {
@@ -117,47 +118,55 @@ fn check_signature(engine: &mut Engine, name: &'static str, hash: bool) -> Statu
         engine.cmd.var(2).as_slice()?;
     }
     if engine.cmd.var(1).as_slice()?.remaining_bits() < SIGNATURE_BITS {
-        return err!(ExceptionCode::CellUnderflow)
+        return err!(ExceptionCode::CellUnderflow);
     }
     let data = if hash {
-        DataForSignature::Hash(engine.cmd.var(2).as_integer()?
-            .as_builder::<UnsignedIntegerBigEndianEncoding>(256)?)
+        DataForSignature::Hash(
+            engine
+                .cmd
+                .var(2)
+                .as_integer()?
+                .as_builder::<UnsignedIntegerBigEndianEncoding>(256)?,
+        )
     } else {
         if engine.cmd.var(2).as_slice()?.remaining_bits() % 8 != 0 {
-            return err!(ExceptionCode::CellUnderflow)
+            return err!(ExceptionCode::CellUnderflow);
         }
         DataForSignature::Slice(engine.cmd.var(2).as_slice()?.get_bytestring(0))
     };
     let pub_key = match ed25519_dalek::PublicKey::from_bytes(pub_key.data()) {
         Ok(pub_key) => pub_key,
-        Err(err) => if engine.check_capabilities(GlobalCapabilities::CapsTvmBugfixes2022 as u64) {
+        Err(err) => {
+            if engine.check_capabilities(GlobalCapabilities::CapsTvmBugfixes2022 as u64) {
                 engine.cc.stack.push(boolean!(false));
-                return Ok(())
+                return Ok(());
             } else {
-                return err!(ExceptionCode::FatalError, "cannot load public key {}", err)
+                return err!(ExceptionCode::FatalError, "cannot load public key {}", err);
             }
+        }
     };
     let signature = engine.cmd.var(1).as_slice()?.get_bytestring(0);
     let signature = match ed25519::signature::Signature::from_bytes(&signature[..SIGNATURE_BYTES]) {
         Ok(signature) => signature,
-        Err(err) => {
+        Err(err) =>
+        {
             #[allow(clippy::collapsible_else_if)]
             if engine.check_capabilities(GlobalCapabilities::CapsTvmBugfixes2022 as u64) {
                 engine.cc.stack.push(boolean!(false));
-                return Ok(())    
+                return Ok(());
             } else {
                 if hash {
                     engine.cc.stack.push(boolean!(false));
-                    return Ok(())        
+                    return Ok(());
                 } else {
-                    return err!(ExceptionCode::FatalError, "cannot load signature {}", err)
+                    return err!(ExceptionCode::FatalError, "cannot load signature {}", err);
                 }
             }
         }
     };
     let data = preprocess_signed_data(engine, data.as_ref());
     #[cfg(feature = "signature_no_check")]
-    let result = 
+    let result =
         engine.modifiers.chksig_always_succeed || pub_key.verify(&data, &signature).is_ok();
     #[cfg(not(feature = "signature_no_check"))]
     let result = pub_key.verify(&data, &signature).is_ok();

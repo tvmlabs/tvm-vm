@@ -1,7 +1,7 @@
 [package]
 build = 'common/build/build.rs'
 edition = '2021'
-name = 'ton_vm'
+name = 'tvm_vm'
 version = '1.8.227'
 
 [dependencies]
@@ -16,8 +16,8 @@ num-traits = '0.2'
 rand = '0.7'
 diffy = { optional = true, version = '0.2.2' }
 similar = { features = [ 'bytes' ], optional = true, version = '2.2.0' }
-ton_block = { git = 'https://github.com/tonlabs/ever-block.git', tag = '1.9.119' }
-ton_types = { git = 'https://github.com/tonlabs/ever-types.git', tag = '2.0.31' }
+tvm_block = { git = 'https://github.com/tvmlabs/tvm-block.git', branch = "main" }
+tvm_types = { git = 'https://github.com/tvmlabs/tvm-types.git', branch = "main" }
 zstd = { default-features = false, optional = true, version = '0.11' }
 
 [dev-dependencies]
@@ -29,10 +29,10 @@ pprof = { features = [ 'criterion', 'flamegraph' ], version = '0.11' }
 
 [features]
 fift_check = [  ]
-gosh = [ 'ton_block/gosh', 'diffy', 'similar', 'zstd' ]
+gosh = [ 'tvm_block/gosh', 'diffy', 'similar', 'zstd' ]
 log_file = [  ]
 signature_no_check = [  ]
-signature_with_id = [ 'ton_block/signature_with_id' ]
+signature_with_id = [ 'tvm_block/signature_with_id' ]
 verbose = [  ]
 
 [[bench]]
@@ -43,5 +43,3 @@ name = 'benchmarks'
 bench = false
 
 [profile]
-
-

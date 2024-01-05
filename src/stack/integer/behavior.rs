@@ -11,8 +11,11 @@
 * limitations under the License.
 */
 
-use crate::{error::TvmError, types::{Exception, Status}};
-use ton_types::{error, types::ExceptionCode};
+use crate::{
+    error::TvmError,
+    types::{Exception, Status},
+};
+use tvm_types::{error, types::ExceptionCode};
 
 pub trait OperationBehavior {
     fn quiet() -> bool;
@@ -29,21 +32,21 @@ pub struct Quiet {}
 macro_rules! on_integer_overflow {
     ($T: ident) => {{
         $T::on_integer_overflow(file!(), line!())
-    }}
+    }};
 }
 
 #[macro_export]
 macro_rules! on_nan_parameter {
     ($T: ident) => {{
         $T::on_nan_parameter(file!(), line!())
-    }}
+    }};
 }
 
 #[macro_export]
 macro_rules! on_range_check_error {
     ($T: ident) => {{
         $T::on_range_check_error(file!(), line!())
-    }}
+    }};
 }
 
 impl OperationBehavior for Signaling {

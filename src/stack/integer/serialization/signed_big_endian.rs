@@ -27,10 +27,10 @@ use crate::{
 };
 use num::bigint::ToBigInt;
 use num_traits::Signed;
-use ton_types::{error, BuilderData, ExceptionCode, Result};
+use tvm_types::{error, BuilderData, ExceptionCode, Result};
 
 pub struct SignedIntegerBigEndianEncoding {
-    length_in_bits: usize
+    length_in_bits: usize,
 }
 
 impl Encoding for SignedIntegerBigEndianEncoding {
@@ -47,7 +47,12 @@ impl Serializer<IntegerData> for SignedIntegerBigEndianEncoding {
             //   −2^(n−1) <= x < 2^(n−1) (for signed integer serialization)
             //   or 0 <= x < 2^n (for unsigned integer serialization),
             //   a range check exception is usually generated
-            return err!(ExceptionCode::RangeCheckError, "{} is not fit in {}", value, self.length_in_bits)
+            return err!(
+                ExceptionCode::RangeCheckError,
+                "{} is not fit in {}",
+                value,
+                self.length_in_bits
+            );
         }
 
         let mut value = value.take_value_of(|x| x.to_bigint())?;

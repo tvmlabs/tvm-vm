@@ -18,7 +18,9 @@ use crate::{
     types::{Exception, ResultOpt},
 };
 use std::fmt;
-use ton_types::{error, ExceptionCode, Result, SliceData, HashmapE, HashmapType, BuilderData, IBitstring};
+use tvm_types::{
+    error, BuilderData, ExceptionCode, HashmapE, HashmapType, IBitstring, Result, SliceData,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SaveList {
@@ -35,12 +37,16 @@ impl SaveList {
     pub const NUMREGS: usize = 7;
     pub const REGS: [usize; Self::NUMREGS] = [0, 1, 2, 3, 4, 5, 7];
     const fn adjust(index: usize) -> usize {
-        if index == 7 { 6 } else { index }
+        if index == 7 {
+            6
+        } else {
+            index
+        }
     }
 
     pub fn new() -> Self {
         Self {
-            storage: Default::default()
+            storage: Default::default(),
         }
     }
     pub fn can_put(index: usize, value: &StackItem) -> bool {
@@ -49,14 +55,19 @@ impl SaveList {
             2 => value.as_continuation().is_ok() || value.is_null(),
             4 | 5 => value.as_cell().is_ok(),
             7 => value.as_tuple().is_ok(),
-            _ => false
+            _ => false,
         }
     }
     pub fn check_can_put(index: usize, value: &StackItem) -> Result<()> {
         if Self::can_put(index, value) {
             Ok(())
         } else {
-            err!(ExceptionCode::TypeCheckError, "wrong item {} for index {}", value, index)
+            err!(
+                ExceptionCode::TypeCheckError,
+                "wrong item {} for index {}",
+                value,
+                index
+            )
         }
     }
     pub fn get(&self, index: usize) -> Option<&StackItem> {
@@ -79,7 +90,10 @@ impl SaveList {
     }
     pub fn put_opt(&mut self, index: usize, value: &mut StackItem) -> Option<StackItem> {
         debug_assert!(Self::can_put(index, value));
-        std::mem::replace(&mut self.storage[Self::adjust(index)], Some(value.withdraw()))
+        std::mem::replace(
+            &mut self.storage[Self::adjust(index)],
+            Some(value.withdraw()),
+        )
     }
     pub fn apply(&mut self, other: &mut Self) {
         for index in 0..Self::NUMREGS {

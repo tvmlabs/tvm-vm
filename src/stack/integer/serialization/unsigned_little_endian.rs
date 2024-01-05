@@ -15,20 +15,17 @@ use crate::{
     error::TvmError,
     stack::{
         integer::{
-            serialization::{
-                common::bits_to_bytes,
-                Encoding,
-            },
+            serialization::{common::bits_to_bytes, Encoding},
             IntegerData,
         },
         serialization::{Deserializer, Serializer},
     },
     types::Exception,
 };
-use ton_types::{error, BuilderData, ExceptionCode, Result};
+use tvm_types::{error, BuilderData, ExceptionCode, Result};
 
 pub struct UnsignedIntegerLittleEndianEncoding {
-    length_in_bits: usize
+    length_in_bits: usize,
 }
 
 impl Encoding for UnsignedIntegerLittleEndianEncoding {
@@ -45,7 +42,12 @@ impl Serializer<IntegerData> for UnsignedIntegerLittleEndianEncoding {
             //   −2^(n−1) <= x < 2^(n−1) (for signed integer serialization)
             //   or 0 <= x < 2^n (for unsigned integer serialization),
             //   a range check exception is usually generated
-            return err!(ExceptionCode::RangeCheckError, "{} is not fit in {}", value, self.length_in_bits)
+            return err!(
+                ExceptionCode::RangeCheckError,
+                "{} is not fit in {}",
+                value,
+                self.length_in_bits
+            );
         }
 
         let value = value.take_value_of(|x| x.to_biguint())?;
@@ -66,4 +68,3 @@ impl Deserializer<IntegerData> for UnsignedIntegerLittleEndianEncoding {
         IntegerData::from(value).unwrap_or_default()
     }
 }
-

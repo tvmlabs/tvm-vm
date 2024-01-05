@@ -12,16 +12,24 @@
 */
 
 use crate::{
-    executor::{Engine, engine::storage::swap, microcode::{CTRL, SAVELIST, VAR}},
-    stack::{StackItem, continuation::ContinuationData}
+    executor::{
+        engine::storage::swap,
+        microcode::{CTRL, SAVELIST, VAR},
+        Engine,
+    },
+    stack::{continuation::ContinuationData, StackItem},
 };
-use ton_types::{Cell, SliceData, types::ExceptionCode};
-use ton_block::GlobalCapabilities;
+use tvm_block::GlobalCapabilities;
+use tvm_types::{types::ExceptionCode, Cell, SliceData};
 
 #[test]
 fn test_swap_with_any() {
     let mut engine = Engine::with_capabilities(0).setup_with_libraries(
-        SliceData::new_empty(), None, None, None, vec![]
+        SliceData::new_empty(),
+        None,
+        None,
+        None,
+        vec![],
     );
     let mut c0 = ContinuationData::new_empty();
     let mut c1 = ContinuationData::new_empty();
@@ -44,9 +52,8 @@ fn test_swap_with_any() {
 
 #[test]
 fn test_swap_with_none() {
-    let mut engine = Engine::with_capabilities(GlobalCapabilities::CapsTvmBugfixes2022 as u64).setup_with_libraries(
-        SliceData::new_empty(), None, None, None, vec![]
-    );
+    let mut engine = Engine::with_capabilities(GlobalCapabilities::CapsTvmBugfixes2022 as u64)
+        .setup_with_libraries(SliceData::new_empty(), None, None, None, vec![]);
     engine.cmd.push_var(StackItem::Cell(Cell::default()));
     engine.cmd.push_var(StackItem::None);
     //try to put CELL to c4 - Ok
@@ -71,7 +78,11 @@ fn test_swap_with_none() {
 #[test]
 fn test_swap_with_ctrl() {
     let mut engine = Engine::with_capabilities(0).setup_with_libraries(
-        SliceData::new_empty(), None, None, None, vec![]
+        SliceData::new_empty(),
+        None,
+        None,
+        None,
+        vec![],
     );
     let c0 = ContinuationData::new_empty();
     let c1 = ContinuationData::new_empty();

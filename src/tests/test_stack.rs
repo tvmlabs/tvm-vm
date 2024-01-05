@@ -11,8 +11,8 @@
 * limitations under the License.
 */
 
-use ton_types::{BuilderData, SliceData};
 use super::{Stack, StackItem};
+use tvm_types::{BuilderData, SliceData};
 
 #[test]
 fn test_push_increases_depth() {
@@ -39,15 +39,24 @@ fn test_fift_output() {
     assert_eq!(StackItem::nan().dump_as_fift(), "NaN");
     let builder = BuilderData::with_bitstring(vec![0x57, 0x74]).unwrap();
     let cell = builder.clone().into_cell().unwrap();
-    assert_eq!(StackItem::cell(cell.clone()).dump_as_fift(), "C{A657BCF14616E598023A10E66EA9B79E3E9CD9F93F338EB6DACE17F475A300F8}");
+    assert_eq!(
+        StackItem::cell(cell.clone()).dump_as_fift(),
+        "C{A657BCF14616E598023A10E66EA9B79E3E9CD9F93F338EB6DACE17F475A300F8}"
+    );
     assert_eq!(StackItem::builder(builder).dump_as_fift(), "BC{00035774}");
     let builder = BuilderData::with_bitstring(vec![0x57, 0x74, 0x80]).unwrap();
     assert_eq!(StackItem::builder(builder).dump_as_fift(), "BC{00045774}");
     let builder = BuilderData::with_bitstring(vec![0x57, 0x60]).unwrap();
     assert_eq!(StackItem::builder(builder).dump_as_fift(), "BC{00035760}");
-    assert_eq!(StackItem::slice(SliceData::load_cell(cell).unwrap()).dump_as_fift(), "CS{Cell{00035774} bits: 0..13; refs: 0..0}");
+    assert_eq!(
+        StackItem::slice(SliceData::load_cell(cell).unwrap()).dump_as_fift(),
+        "CS{Cell{00035774} bits: 0..13; refs: 0..0}"
+    );
     assert_eq!(StackItem::tuple(vec![]).dump_as_fift(), "[]");
-    assert_eq!(StackItem::tuple(vec![StackItem::nan(), StackItem::int(1234567890)]).dump_as_fift(), "[ NaN 1234567890 ]");
+    assert_eq!(
+        StackItem::tuple(vec![StackItem::nan(), StackItem::int(1234567890)]).dump_as_fift(),
+        "[ NaN 1234567890 ]"
+    );
 }
 
 mod test_serialization {
@@ -58,18 +67,19 @@ mod test_serialization {
         let code = SliceData::new(vec![12, 13, 0x80]);
         let mut cont = ContinuationData::with_code(code);
         let mut item = StackItem::int(0);
-        let count = if cfg!(feature="ci_run") { 1000 } else {3};
+        let count = if cfg!(feature = "ci_run") { 1000 } else { 3 };
         for i in 1..count {
             item = StackItem::tuple(vec![StackItem::int(i), item]);
         }
         cont.stack.push(item);
-        let tuple = vec![
-            StackItem::int(888),
-            StackItem::int(1234),
-        ];
+        let tuple = vec![StackItem::int(888), StackItem::int(1234)];
         cont.savelist.put(7, &mut StackItem::tuple(tuple)).unwrap();
-        cont.savelist.put(4, &mut StackItem::cell(Default::default())).unwrap();
-        cont.savelist.put(0, &mut StackItem::continuation(cont.clone())).unwrap();
+        cont.savelist
+            .put(4, &mut StackItem::cell(Default::default()))
+            .unwrap();
+        cont.savelist
+            .put(0, &mut StackItem::continuation(cont.clone()))
+            .unwrap();
         cont
     }
 
@@ -97,10 +107,7 @@ mod test_serialization {
 
     #[test]
     fn test_simple_tuple() {
-        let item = StackItem::tuple(vec!(
-            StackItem::int(200),
-            StackItem::int(100500),
-        ));
+        let item = StackItem::tuple(vec![StackItem::int(200), StackItem::int(100500)]);
         let builder = item.serialize(&mut 0).unwrap();
         let slice = SliceData::load_builder(builder).unwrap();
         let new_item = StackItem::deserialize(slice, &mut 0).unwrap();
@@ -109,15 +116,12 @@ mod test_serialization {
 
     #[test]
     fn test_complex_tuple() {
-        let tuple = vec!(
-            StackItem::int(1),
-            StackItem::int(2),
-        );
-        let item = StackItem::tuple(vec!(
+        let tuple = vec![StackItem::int(1), StackItem::int(2)];
+        let item = StackItem::tuple(vec![
             StackItem::int(200),
             StackItem::int(100500),
             StackItem::tuple(tuple),
-        ));
+        ]);
         let builder = item.serialize(&mut 0).unwrap();
         let slice = SliceData::load_builder(builder).unwrap();
         let new_item = StackItem::deserialize(slice, &mut 0).unwrap();

@@ -14,20 +14,29 @@
 use crate::{
     error::{tvm_exception_code, TvmError},
     executor::{
-        engine::{Engine, storage::fetch_stack}, types::{InstructionOptions, Instruction}
+        engine::{storage::fetch_stack, Engine},
+        types::{Instruction, InstructionOptions},
     },
     stack::{
-        StackItem,
         integer::{
+            behavior::OperationBehavior,
+            math::{
+                utils::{div_by_shift, divmod},
+                Round,
+            },
+            utils::{binary_op, construct_double_nan, process_double_result, unary_op},
             IntegerData,
-            behavior::OperationBehavior, math::{Round, utils::{div_by_shift, divmod}},
-            utils::{unary_op, binary_op, process_double_result, construct_double_nan}
-        }
+        },
+        StackItem,
     },
-    types::{Exception, Status}
+    types::{Exception, Status},
 };
 use std::{cmp::Ordering, mem};
-use ton_types::{error, Result, types::{Bitmask, ExceptionCode}};
+use tvm_types::{
+    error,
+    types::{Bitmask, ExceptionCode},
+    Result,
+};
 
 // Common definitions *********************************************************
 
@@ -41,13 +50,11 @@ type FnFits = fn(&IntegerData, usize) -> Result<bool>;
 // Implementation of binary operation which takes both arguments from stack
 fn binary<T>(engine: &mut Engine, name: &'static str, handler: Binary) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    engine.load_instruction(
-        Instruction::new(name).set_name_prefix(T::name_prefix())
-    )?;
+    engine.load_instruction(Instruction::new(name).set_name_prefix(T::name_prefix()))?;
     if engine.cc.stack.depth() < 2 {
-        return err!(ExceptionCode::StackUnderflow)
+        return err!(ExceptionCode::StackUnderflow);
     }
     let v0 = engine.cc.stack.get_mut(0).withdraw();
     let v1 = engine.cc.stack.get_mut(1).as_integer_mut()?;
@@ -58,13 +65,11 @@ where
 
 fn binary_assign<T>(engine: &mut Engine, name: &'static str, handler: BinaryAssign) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    engine.load_instruction(
-        Instruction::new(name).set_name_prefix(T::name_prefix())
-    )?;
+    engine.load_instruction(Instruction::new(name).set_name_prefix(T::name_prefix()))?;
     if engine.cc.stack.depth() < 2 {
-        return err!(ExceptionCode::StackUnderflow)
+        return err!(ExceptionCode::StackUnderflow);
     }
     let v0 = engine.cc.stack.get_mut(0).withdraw();
     let v1 = engine.cc.stack.get_mut(1).as_integer_mut()?;
@@ -77,15 +82,15 @@ where
 // and another from instruction
 fn binary_with_const<T>(engine: &mut Engine, name: &'static str, handler: BinaryConst) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     engine.load_instruction(
         Instruction::new(name)
             .set_name_prefix(T::name_prefix())
-            .set_opts(InstructionOptions::Integer(-128..128))
+            .set_opts(InstructionOptions::Integer(-128..128)),
     )?;
     if engine.cc.stack.depth() < 1 {
-        return err!(ExceptionCode::StackUnderflow)
+        return err!(ExceptionCode::StackUnderflow);
     }
     let v0 = engine.cmd.integer();
     let v1 = engine.cc.stack.get_mut(0).as_integer_mut()?;
@@ -98,11 +103,9 @@ const MIN: Bitmask = 0x01;
 const MAX: Bitmask = 0x02;
 fn minmax<T>(engine: &mut Engine, name: &'static str, compare_type: Bitmask) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    engine.load_instruction(
-        Instruction::new(name).set_name_prefix(T::name_prefix())
-    )?;
+    engine.load_instruction(Instruction::new(name).set_name_prefix(T::name_prefix()))?;
     fetch_stack(engine, 2)?;
     let mut x = engine.cmd.var(0).clone();
     let mut y = engine.cmd.var(1).clone();
@@ -111,12 +114,16 @@ where
             on_nan_parameter!(T)?;
             x = int!(nan);
             y = int!(nan);
-        },
-        Some(Ordering::Less) => if compare_type == MAX {
-            mem::swap(&mut x, &mut y);
         }
-        _ => if compare_type != MAX {
-            mem::swap(&mut x, &mut y);
+        Some(Ordering::Less) => {
+            if compare_type == MAX {
+                mem::swap(&mut x, &mut y);
+            }
+        }
+        _ => {
+            if compare_type != MAX {
+                mem::swap(&mut x, &mut y);
+            }
         }
     };
     engine.cc.stack.push(x);
@@ -129,10 +136,10 @@ where
 // Implementation of common function for different fits_in
 fn fits_in<T>(engine: &mut Engine, length: usize, op_fit: FnFits) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     if engine.cc.stack.depth() < 1 {
-        return err!(ExceptionCode::StackUnderflow)
+        return err!(ExceptionCode::StackUnderflow);
     }
     let x = engine.cc.stack.get(0).as_integer()?;
     if x.is_nan() {
@@ -148,13 +155,11 @@ where
 // Implementation of unary operation which takes its argument from stack
 fn unary<T>(engine: &mut Engine, name: &'static str, handler: Unary) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    engine.load_instruction(
-        Instruction::new(name).set_name_prefix(T::name_prefix())
-    )?;
+    engine.load_instruction(Instruction::new(name).set_name_prefix(T::name_prefix()))?;
     if engine.cc.stack.depth() < 1 {
-        return err!(ExceptionCode::StackUnderflow)
+        return err!(ExceptionCode::StackUnderflow);
     }
     let v0 = engine.cc.stack.get_mut(0).as_integer_mut()?;
     *v0 = handler(v0)?;
@@ -165,15 +170,15 @@ where
 // and makes use of the parameter from instruction
 fn unary_with_len<T>(engine: &mut Engine, name: &'static str, handler: UnaryWithLen) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     engine.load_instruction(
         Instruction::new(name)
             .set_name_prefix(T::name_prefix())
-            .set_opts(InstructionOptions::LengthMinusOne(0..256))
+            .set_opts(InstructionOptions::LengthMinusOne(0..256)),
     )?;
     if engine.cc.stack.depth() < 1 {
-        return err!(ExceptionCode::StackUnderflow)
+        return err!(ExceptionCode::StackUnderflow);
     }
     let v0 = engine.cc.stack.get_mut(0).as_integer_mut()?;
     *v0 = handler(v0, engine.cmd.length())?;
@@ -193,7 +198,7 @@ macro_rules! boolint {
 macro_rules! cmp {
     ($x:expr, $y:expr, $t:ty, $rule:expr) => {
         compare::<$t>($x, $y, $rule, file!(), line!())
-    }
+    };
 }
 
 // Comparison rules
@@ -206,10 +211,10 @@ fn compare<T>(
     y: &IntegerData,
     comparison_rule: Bitmask,
     file: &'static str,
-    line: u32
+    line: u32,
 ) -> Result<IntegerData>
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     let result = x.compare::<T>(y)?;
     if comparison_rule == 0 {
@@ -359,20 +364,19 @@ impl DivMode {
 // (x – |x|)
 pub(super) fn execute_abs<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    engine.load_instruction(
-        Instruction::new("ABS").set_name_prefix(T::name_prefix())
-    )?;
+    engine.load_instruction(Instruction::new("ABS").set_name_prefix(T::name_prefix()))?;
     fetch_stack(engine, 1)?;
     let var = engine.cmd.var(0).clone();
     if var.as_integer()?.is_nan() {
         on_nan_parameter!(T)?;
         engine.cc.stack.push(var);
     } else if var.as_integer()?.is_neg() {
-        engine.cc.stack.push(StackItem::int(
-            var.as_integer()?.neg::<T>()?
-        ));
+        engine
+            .cc
+            .stack
+            .push(StackItem::int(var.as_integer()?.neg::<T>()?));
     } else {
         engine.cc.stack.push(var);
     }
@@ -382,7 +386,7 @@ where
 // (x y - x+y)
 pub(super) fn execute_add<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     binary_assign::<T>(engine, "ADD", |y, x| x.add_assign::<T>(y))
 }
@@ -390,7 +394,7 @@ where
 // (x - x+y)
 pub(super) fn execute_addconst<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     binary_with_const::<T>(engine, "ADDCONST", |y, x| x.add_i8::<T>(&(y as i8)))
 }
@@ -398,7 +402,7 @@ where
 // (x y - x&y)
 pub(super) fn execute_and<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     binary::<T>(engine, "AND", |y, x| x.and::<T>(y))
 }
@@ -406,9 +410,9 @@ where
 // (x - c)
 pub(super) fn execute_bitsize<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    unary::<T>(engine, "BITSIZE", |x|
+    unary::<T>(engine, "BITSIZE", |x| {
         if x.is_nan() {
             on_nan_parameter!(T)?;
             Ok(IntegerData::nan())
@@ -417,19 +421,17 @@ where
         } else {
             Ok(IntegerData::from_u32(x.bitsize()? as u32))
         }
-    )
+    })
 }
 
 // (x - x), throws exception if x == NaN
 pub(super) fn execute_chknan(engine: &mut Engine) -> Status {
-    engine.load_instruction(
-        Instruction::new("CHKNAN")
-    )?;
+    engine.load_instruction(Instruction::new("CHKNAN"))?;
     if engine.cc.stack.depth() < 1 {
-        return err!(ExceptionCode::StackUnderflow)
+        return err!(ExceptionCode::StackUnderflow);
     }
     if engine.cc.stack.get(0).as_integer()?.is_nan() {
-        return err!(ExceptionCode::IntegerOverflow)
+        return err!(ExceptionCode::IntegerOverflow);
     }
     Ok(())
 }
@@ -437,7 +439,7 @@ pub(super) fn execute_chknan(engine: &mut Engine) -> Status {
 // (x y - x?y)
 pub(super) fn execute_cmp<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     binary::<T>(engine, "CMP", |y, x| cmp!(x, y, T, 0))
 }
@@ -445,13 +447,11 @@ where
 // (x - x-1)
 pub(super) fn execute_dec<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    engine.load_instruction(
-        Instruction::new("DEC").set_name_prefix(T::name_prefix())
-    )?;
+    engine.load_instruction(Instruction::new("DEC").set_name_prefix(T::name_prefix()))?;
     if engine.cc.stack.depth() < 1 {
-        return err!(ExceptionCode::StackUnderflow)
+        return err!(ExceptionCode::StackUnderflow);
     }
     let v0 = engine.cc.stack.get_mut(0).as_integer_mut()?;
     *v0 = v0.sub_i8::<T>(&1)?;
@@ -478,12 +478,12 @@ fn get_shift(engine: &Engine, index: &mut isize) -> Result<usize> {
 // Multiple division modes
 pub(super) fn execute_divmod<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     engine.load_instruction(
         Instruction::new("DIV")
             .set_name_prefix(T::name_prefix())
-            .set_opts(InstructionOptions::DivisionMode)
+            .set_opts(InstructionOptions::DivisionMode),
     )?;
     let mode = engine.cmd.division_mode().clone();
     if !mode.is_valid() {
@@ -509,19 +509,14 @@ where
         let mut y = get_var(engine, &mut index)?;
         let x_opt = if mode.mul_by_shift() {
             let shift = get_shift(engine, &mut index)?;
-            unary_op::<T, _, _, _, _, _>(
-                x,
-                |x| x << shift,
-                || None,
-                |result, _| Ok(Some(result))
-            )?
+            unary_op::<T, _, _, _, _, _>(x, |x| x << shift, || None, |result, _| Ok(Some(result)))?
         } else {
             binary_op::<T, _, _, _, _, _>(
                 x,
                 y,
                 |x, y| x * y,
                 || None,
-                |result, _| Ok(Some(result))
+                |result, _| Ok(Some(result)),
             )?
         };
 
@@ -533,7 +528,7 @@ where
                     let shift = get_shift(engine, &mut index)?;
                     process_double_result::<T, _>(
                         div_by_shift(x, shift, rounding),
-                        construct_double_nan
+                        construct_double_nan,
                     )?
                 } else {
                     if !mode.mul_by_shift() {
@@ -547,7 +542,7 @@ where
                             y,
                             |y| divmod(x, y, rounding),
                             construct_double_nan,
-                            process_double_result::<T, _>
+                            process_double_result::<T, _>,
                         )?
                     }
                 }
@@ -573,7 +568,7 @@ where
 // (x y - x==y)
 pub(super) fn execute_equal<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     binary::<T>(engine, "EQUAL", |y, x| cmp!(x, y, T, EQUAL))
 }
@@ -581,34 +576,33 @@ where
 // (x - x==y)
 pub(super) fn execute_eqint<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    binary_with_const::<T>(engine, "EQINT", |y, x| cmp!(x, &IntegerData::from_i32(y as i32), T, EQUAL))
+    binary_with_const::<T>(engine, "EQINT", |y, x| {
+        cmp!(x, &IntegerData::from_i32(y as i32), T, EQUAL)
+    })
 }
 
 // (x - x), throws exception if does not fit
 pub(super) fn execute_fits<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     engine.load_instruction(
         Instruction::new("FITS")
             .set_name_prefix(T::name_prefix())
-            .set_opts(InstructionOptions::LengthMinusOne(0..256))
+            .set_opts(InstructionOptions::LengthMinusOne(0..256)),
     )?;
     let length = engine.cmd.length();
-    fits_in::<T>(engine,length,IntegerData::fits_in)
+    fits_in::<T>(engine, length, IntegerData::fits_in)
 }
 
 // (x c - x), throws exception if does not fit
 pub(super) fn execute_fitsx<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    engine.load_instruction(
-        Instruction::new("FITSX")
-            .set_name_prefix(T::name_prefix())
-    )?;
+    engine.load_instruction(Instruction::new("FITSX").set_name_prefix(T::name_prefix()))?;
     fetch_stack(engine, 1)?;
     let length = engine.cmd.var(0).as_integer()?.into(0..=1023)?;
     fits_in::<T>(engine, length, IntegerData::fits_in)
@@ -617,7 +611,7 @@ where
 // (x y - x>=y)
 pub(super) fn execute_geq<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     binary::<T>(engine, "GEQ", |y, x| cmp!(x, y, T, EQUAL | GREATER))
 }
@@ -625,7 +619,7 @@ where
 // (x y - x>y)
 pub(super) fn execute_greater<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     binary::<T>(engine, "GREATER", |y, x| cmp!(x, y, T, GREATER))
 }
@@ -633,21 +627,21 @@ where
 // (x - x>y)
 pub(super) fn execute_gtint<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    binary_with_const::<T>(engine, "GTINT", |y, x| cmp!(x, &IntegerData::from_i32(y as i32), T, GREATER))
+    binary_with_const::<T>(engine, "GTINT", |y, x| {
+        cmp!(x, &IntegerData::from_i32(y as i32), T, GREATER)
+    })
 }
 
 // (x - x+1)
 pub(super) fn execute_inc<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    engine.load_instruction(
-        Instruction::new("INC").set_name_prefix(T::name_prefix())
-    )?;
+    engine.load_instruction(Instruction::new("INC").set_name_prefix(T::name_prefix()))?;
     if engine.cc.stack.depth() < 1 {
-        return err!(ExceptionCode::StackUnderflow)
+        return err!(ExceptionCode::StackUnderflow);
     }
     let v0 = engine.cc.stack.get_mut(0).as_integer_mut()?;
     *v0 = v0.add_i8::<T>(&1)?;
@@ -656,9 +650,7 @@ where
 
 // (x - x==NaN)
 pub(super) fn execute_isnan(engine: &mut Engine) -> Status {
-    engine.load_instruction(
-        Instruction::new("ISNAN")
-    )?;
+    engine.load_instruction(Instruction::new("ISNAN"))?;
     fetch_stack(engine, 1)?;
     let is_nan = engine.cmd.var(0).as_integer()?.is_nan();
     engine.cc.stack.push(boolean!(is_nan));
@@ -668,7 +660,7 @@ pub(super) fn execute_isnan(engine: &mut Engine) -> Status {
 // (x y - x<=y)
 pub(super) fn execute_leq<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     binary::<T>(engine, "LEQ", |y, x| cmp!(x, y, T, EQUAL | LESS))
 }
@@ -676,7 +668,7 @@ where
 // (x y - x<y)
 pub(super) fn execute_less<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     binary::<T>(engine, "LESS", |y, x| cmp!(x, y, T, LESS))
 }
@@ -684,15 +676,17 @@ where
 // (x - x<y)
 pub(super) fn execute_lessint<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    binary_with_const::<T>(engine, "LESSINT", |y, x| cmp!(x, &IntegerData::from_i32(y as i32), T, LESS))
+    binary_with_const::<T>(engine, "LESSINT", |y, x| {
+        cmp!(x, &IntegerData::from_i32(y as i32), T, LESS)
+    })
 }
 
 // (x y - x<<y)
 pub(super) fn execute_lshift<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     if engine.last_cmd() == 0xAC {
         binary::<T>(engine, "LSHIFT", |y, x| x.shl::<T>(y.into(0..=1023)?))
@@ -704,7 +698,7 @@ where
 // (x y - max(x, y))
 pub(super) fn execute_max<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     minmax::<T>(engine, "MAX", MAX)
 }
@@ -712,7 +706,7 @@ where
 // (x y - min(x, y))
 pub(super) fn execute_min<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     minmax::<T>(engine, "MIN", MIN)
 }
@@ -720,7 +714,7 @@ where
 // (x y - min(x, y) max(y,x))
 pub(super) fn execute_minmax<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     minmax::<T>(engine, "MINMAX", MIN | MAX)
 }
@@ -728,7 +722,7 @@ where
 // (x y - x*y)
 pub(super) fn execute_mul<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     binary::<T>(engine, "MUL", |y, x| x.mul::<T>(y))
 }
@@ -736,7 +730,7 @@ where
 // (x - x*y)
 pub(super) fn execute_mulconst<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     binary_with_const::<T>(engine, "MULCONST", |y, x| x.mul_i8::<T>(&(y as i8)))
 }
@@ -744,7 +738,7 @@ where
 // (x - -x)
 pub(super) fn execute_negate<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     unary::<T>(engine, "NEGATE", |x| x.neg::<T>())
 }
@@ -752,7 +746,7 @@ where
 // (x y - x!=y)
 pub(super) fn execute_neq<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     binary::<T>(engine, "NEQ", |y, x| cmp!(x, y, T, GREATER | LESS))
 }
@@ -760,15 +754,17 @@ where
 // (x - x!=y)
 pub(super) fn execute_neqint<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    binary_with_const::<T>(engine, "NEQINT", |y, x| cmp!(x, &IntegerData::from_i32(y as i32), T, GREATER | LESS))
+    binary_with_const::<T>(engine, "NEQINT", |y, x| {
+        cmp!(x, &IntegerData::from_i32(y as i32), T, GREATER | LESS)
+    })
 }
 
 // (x y - ~x)
 pub(super) fn execute_not<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     unary::<T>(engine, "NOT", |x| x.not::<T>())
 }
@@ -776,7 +772,7 @@ where
 // (x y - x|y)
 pub(super) fn execute_or<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     binary::<T>(engine, "OR", |y, x| x.or::<T>(y))
 }
@@ -784,28 +780,24 @@ where
 // (x - 2^x)
 pub(super) fn execute_pow2<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    unary::<T>(engine, "POW2",
-        |x| {
-            match x.into(0..=1023) {
-                Ok(shift) => IntegerData::one().shl::<T>(shift),
-                Err(exception) => match tvm_exception_code(&exception) {
-                    Some(ExceptionCode::IntegerOverflow) => {
-                        on_integer_overflow!(T)?;
-                        Ok(IntegerData::nan())
-                    }
-                    _ => Err(exception)
-                }
+    unary::<T>(engine, "POW2", |x| match x.into(0..=1023) {
+        Ok(shift) => IntegerData::one().shl::<T>(shift),
+        Err(exception) => match tvm_exception_code(&exception) {
+            Some(ExceptionCode::IntegerOverflow) => {
+                on_integer_overflow!(T)?;
+                Ok(IntegerData::nan())
             }
-        }
-    )
+            _ => Err(exception),
+        },
+    })
 }
 
 // (x - x>>y)
 pub(super) fn execute_rshift<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     if engine.last_cmd() == 0xAD {
         binary::<T>(engine, "RSHIFT", |y, x| x.shr::<T>(y.into(0..=1023)?))
@@ -817,29 +809,27 @@ where
 // (x - sign(x))
 pub(super) fn execute_sgn<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    unary::<T>(engine, "SGN",
-        |x| {
-            if x.is_nan() {
-                on_nan_parameter!(T)?;
-                return Ok(IntegerData::nan());
-            }
-            Ok(if x.is_neg() {
-                IntegerData::minus_one()
-            } else if x.is_zero() {
-                IntegerData::zero()
-            } else {
-                IntegerData::one()
-            })
+    unary::<T>(engine, "SGN", |x| {
+        if x.is_nan() {
+            on_nan_parameter!(T)?;
+            return Ok(IntegerData::nan());
         }
-    )
+        Ok(if x.is_neg() {
+            IntegerData::minus_one()
+        } else if x.is_zero() {
+            IntegerData::zero()
+        } else {
+            IntegerData::one()
+        })
+    })
 }
 
 // (x y - x-y)
 pub(super) fn execute_sub<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     binary::<T>(engine, "SUB", |y, x| x.sub::<T>(y))
 }
@@ -847,7 +837,7 @@ where
 // (x y - y-x)
 pub(super) fn execute_subr<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     binary::<T>(engine, "SUB", |y, x| y.sub::<T>(x))
 }
@@ -855,27 +845,27 @@ where
 // (x - c)
 pub(super) fn execute_ubitsize<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    unary::<T>(engine, "UBITSIZE", |x|
+    unary::<T>(engine, "UBITSIZE", |x| {
         if x.is_nan() || x.is_neg() {
             on_range_check_error!(T)?;
             Ok(IntegerData::nan())
         } else {
             Ok(IntegerData::from_u32(x.ubitsize()? as u32))
         }
-    )
+    })
 }
 
 // (x - x), throws exception if does not fit
 pub(super) fn execute_ufits<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     engine.load_instruction(
         Instruction::new("UFITS")
             .set_name_prefix(T::name_prefix())
-            .set_opts(InstructionOptions::LengthMinusOne(0..256))
+            .set_opts(InstructionOptions::LengthMinusOne(0..256)),
     )?;
     let length = engine.cmd.length();
     fits_in::<T>(engine, length, IntegerData::ufits_in)
@@ -884,12 +874,9 @@ where
 // (x c - x), throws exception if does not fit
 pub(super) fn execute_ufitsx<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
-    engine.load_instruction(
-        Instruction::new("UFITSX")
-            .set_name_prefix(T::name_prefix())
-    )?;
+    engine.load_instruction(Instruction::new("UFITSX").set_name_prefix(T::name_prefix()))?;
     fetch_stack(engine, 1)?;
     let length = engine.cmd.var(0).as_integer()?.into(0..=1023)?;
     fits_in::<T>(engine, length, IntegerData::ufits_in)
@@ -898,7 +885,7 @@ where
 // (x y - x^y)
 pub(super) fn execute_xor<T>(engine: &mut Engine) -> Status
 where
-    T: OperationBehavior
+    T: OperationBehavior,
 {
     binary::<T>(engine, "XOR", |y, x| x.xor::<T>(y))
 }

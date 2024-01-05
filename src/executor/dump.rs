@@ -13,15 +13,20 @@
 
 use crate::{
     error::TvmError,
-    executor::{Mask, engine::Engine, types::{Instruction, InstructionOptions}},
-    stack::StackItem, types::{Exception, Status}
+    executor::{
+        engine::Engine,
+        types::{Instruction, InstructionOptions},
+        Mask,
+    },
+    stack::StackItem,
+    types::{Exception, Status},
 };
-use ton_types::{error, types::ExceptionCode};
 use std::{cmp, str, sync::Arc};
+use tvm_types::{error, types::ExceptionCode};
 
-const STR:   u8 = 0x01;
-const HEX:   u8 = 0x02;
-const BIN:   u8 = 0x04;
+const STR: u8 = 0x01;
+const HEX: u8 = 0x02;
+const BIN: u8 = 0x04;
 const DEPTH: u8 = 0x08; // integer 1..15
 const INDEX: u8 = 0x10; // integer 0..15
 const FLUSH: u8 = 0x20; // flush
@@ -34,54 +39,85 @@ fn dump_tuple_impl(x: &[StackItem], how: u8, in_tuple: bool) -> String {
     if in_tuple {
         String::from("(<tuple>)")
     } else {
-        format!("({})", x.iter().map(|v| dump_var_impl(v, how, true)).collect::<Vec<_>>().join(", "))
+        format!(
+            "({})",
+            x.iter()
+                .map(|v| dump_var_impl(v, how, true))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
     }
 }
 
 fn dump_var_impl(item: &StackItem, how: u8, in_tuple: bool) -> String {
     if how.bit(HEX) {
         match item {
-            StackItem::None            => String::new(),
-            StackItem::Builder(x)      => format!("BC<{:X}>", Arc::as_ref(x)),
-            StackItem::Cell(x)         => format!("C<{:X}>", x),
-            StackItem::Continuation(x) => x.code().cell_opt().map_or(String::new(), |cell| format!("R<{:X}>", cell)),
-            StackItem::Integer(x)      => format!("{:X}", Arc::as_ref(x)),
-            StackItem::Slice(x)        => format!("CS<{:X}>({}..{})", x, x.pos(), x.pos() + x.remaining_bits()),
-            StackItem::Tuple(x)        => dump_tuple_impl(x, how, in_tuple),
+            StackItem::None => String::new(),
+            StackItem::Builder(x) => format!("BC<{:X}>", Arc::as_ref(x)),
+            StackItem::Cell(x) => format!("C<{:X}>", x),
+            StackItem::Continuation(x) => x
+                .code()
+                .cell_opt()
+                .map_or(String::new(), |cell| format!("R<{:X}>", cell)),
+            StackItem::Integer(x) => format!("{:X}", Arc::as_ref(x)),
+            StackItem::Slice(x) => {
+                format!("CS<{:X}>({}..{})", x, x.pos(), x.pos() + x.remaining_bits())
+            }
+            StackItem::Tuple(x) => dump_tuple_impl(x, how, in_tuple),
         }
     } else if how.bit(BIN) {
         match item {
-            StackItem::None            => String::new(),
-            StackItem::Builder(x)      => format!("BC<{:b}>", Arc::as_ref(x)),
-            StackItem::Cell(x)         => format!("C<{:b}>", x),
-            StackItem::Continuation(x) => x.code().cell_opt().map_or(String::new(), |cell| format!("R<{:b}>", cell)),
-            StackItem::Integer(x)      => format!("{:b}", Arc::as_ref(x)),
-            StackItem::Slice(x)        => x.cell_opt().map_or(String::new(), |cell| format!("CS<{:b}>({}..{})", cell, x.pos(), x.pos() + x.remaining_bits())),
-            StackItem::Tuple(x)        => dump_tuple_impl(x, how, in_tuple),
+            StackItem::None => String::new(),
+            StackItem::Builder(x) => format!("BC<{:b}>", Arc::as_ref(x)),
+            StackItem::Cell(x) => format!("C<{:b}>", x),
+            StackItem::Continuation(x) => x
+                .code()
+                .cell_opt()
+                .map_or(String::new(), |cell| format!("R<{:b}>", cell)),
+            StackItem::Integer(x) => format!("{:b}", Arc::as_ref(x)),
+            StackItem::Slice(x) => x.cell_opt().map_or(String::new(), |cell| {
+                format!(
+                    "CS<{:b}>({}..{})",
+                    cell,
+                    x.pos(),
+                    x.pos() + x.remaining_bits()
+                )
+            }),
+            StackItem::Tuple(x) => dump_tuple_impl(x, how, in_tuple),
         }
     } else if how.bit(STR) {
         let string = match item {
-            StackItem::None            => return String::new(),
-            StackItem::Builder(x)      => x.data().to_vec(),
-            StackItem::Cell(x)         => x.data().to_vec(),
+            StackItem::None => return String::new(),
+            StackItem::Builder(x) => x.data().to_vec(),
+            StackItem::Cell(x) => x.data().to_vec(),
             StackItem::Continuation(x) => x.code().get_bytestring(0),
-            StackItem::Integer(x)      => return format!("{}", Arc::as_ref(x)),
-            StackItem::Slice(x)        => x.get_bytestring(0),
-            StackItem::Tuple(x)        => dump_tuple_impl(x, how, in_tuple).as_bytes().to_vec(),
+            StackItem::Integer(x) => return format!("{}", Arc::as_ref(x)),
+            StackItem::Slice(x) => x.get_bytestring(0),
+            StackItem::Tuple(x) => dump_tuple_impl(x, how, in_tuple).as_bytes().to_vec(),
         };
         match str::from_utf8(&string) {
             Ok(result) => result.into(),
-            Err(err) => err.to_string()
+            Err(err) => err.to_string(),
         }
     } else {
         match item {
-            StackItem::None            => String::new(),
-            StackItem::Builder(x)      => format!("BC<{:X}>", Arc::as_ref(x)),
-            StackItem::Cell(x)         => format!("C<{:X}>", x),
-            StackItem::Continuation(x) => x.code().cell_opt().map_or(String::new(), |cell| format!("R<{:X}>", cell)),
-            StackItem::Integer(x)      => format!("{}", Arc::as_ref(x)),
-            StackItem::Slice(x)        => x.cell_opt().map_or(String::new(), |cell| format!("CS<{:X}>({}..{})", cell, x.pos(), x.pos() + x.remaining_bits())),
-            StackItem::Tuple(x)        => dump_tuple_impl(x, how, in_tuple),
+            StackItem::None => String::new(),
+            StackItem::Builder(x) => format!("BC<{:X}>", Arc::as_ref(x)),
+            StackItem::Cell(x) => format!("C<{:X}>", x),
+            StackItem::Continuation(x) => x
+                .code()
+                .cell_opt()
+                .map_or(String::new(), |cell| format!("R<{:X}>", cell)),
+            StackItem::Integer(x) => format!("{}", Arc::as_ref(x)),
+            StackItem::Slice(x) => x.cell_opt().map_or(String::new(), |cell| {
+                format!(
+                    "CS<{:X}>({}..{})",
+                    cell,
+                    x.pos(),
+                    x.pos() + x.remaining_bits()
+                )
+            }),
+            StackItem::Tuple(x) => dump_tuple_impl(x, how, in_tuple),
         }
     }
 }
@@ -99,7 +135,9 @@ fn dump_stack(engine: &mut Engine, depth: usize, print_depth: bool) -> Status {
 }
 /// internal dump with how and closure
 fn internal_dump<F>(engine: &mut Engine, name: &'static str, how: u8, op: F) -> Status
-where F: FnOnce(&mut Engine) -> Status {
+where
+    F: FnOnce(&mut Engine) -> Status,
+{
     let mut instruction = Instruction::new(name);
     if how.bit(DEPTH) {
         instruction = instruction.set_opts(InstructionOptions::Integer(1..15))
@@ -226,9 +264,11 @@ pub(crate) fn execute_print_var(engine: &mut Engine) -> Status {
 }
 
 fn internal_dump_string<F>(engine: &mut Engine, name: &'static str, how: u8, op: F) -> Status
-where F: FnOnce(&mut Engine, &str) -> Status {
+where
+    F: FnOnce(&mut Engine, &str) -> Status,
+{
     engine.load_instruction(
-        Instruction::new(name).set_opts(InstructionOptions::Bytestring(12, 0, 4, 1))
+        Instruction::new(name).set_opts(InstructionOptions::Bytestring(12, 0, 4, 1)),
     )?;
     match str::from_utf8(&engine.cmd.slice().get_bytestring(8)) {
         Ok(string) => {
@@ -236,7 +276,13 @@ where F: FnOnce(&mut Engine, &str) -> Status {
                 op(engine, string)?
             }
         }
-        Err(err) => return err!(ExceptionCode::InvalidOpcode, "convert from utf-8 error {}", err)
+        Err(err) => {
+            return err!(
+                ExceptionCode::InvalidOpcode,
+                "convert from utf-8 error {}",
+                err
+            )
+        }
     }
     if how.bit(FLUSH) {
         engine.flush();
@@ -247,9 +293,7 @@ where F: FnOnce(&mut Engine, &str) -> Status {
 pub(crate) fn execute_dump_string(engine: &mut Engine) -> Status {
     let length = 1 + (0x0F & engine.last_cmd() as usize);
     match engine.next_cmd()? {
-        0 if length == 1 => internal_dump_string(engine, "LOGFLUSH", FLUSH, |_, _| {
-            Ok(())
-        }),
+        0 if length == 1 => internal_dump_string(engine, "LOGFLUSH", FLUSH, |_, _| Ok(())),
         0 => internal_dump_string(engine, "LOGSTR", 0, |engine, string| {
             engine.dump(string);
             Ok(())
@@ -262,7 +306,7 @@ pub(crate) fn execute_dump_string(engine: &mut Engine) -> Status {
         _ => internal_dump_string(engine, "DUMPTOSFMT", 0, |engine, string| {
             engine.dump(string);
             Ok(())
-        })
+        }),
     }
 }
 

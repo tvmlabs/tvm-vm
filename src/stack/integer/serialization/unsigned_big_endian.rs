@@ -26,10 +26,10 @@ use crate::{
     },
     types::Exception,
 };
-use ton_types::{error, ExceptionCode, Result};
+use tvm_types::{error, ExceptionCode, Result};
 
 pub struct UnsignedIntegerBigEndianEncoding {
-    length_in_bits: usize
+    length_in_bits: usize,
 }
 
 impl Encoding for UnsignedIntegerBigEndianEncoding {
@@ -47,7 +47,12 @@ impl Serializer<IntegerData> for UnsignedIntegerBigEndianEncoding {
             //   −2^(n−1) <= x < 2^(n−1) (for signed integer serialization)
             //   or 0 <= x < 2^n (for unsigned integer serialization),
             //   a range check exception is usually generated
-            return err!(ExceptionCode::RangeCheckError, "{} cannot fit in {}", value, self.length_in_bits)
+            return err!(
+                ExceptionCode::RangeCheckError,
+                "{} cannot fit in {}",
+                value,
+                self.length_in_bits
+            );
         }
 
         let mut value = value.take_value_of(|x| x.to_biguint())?;

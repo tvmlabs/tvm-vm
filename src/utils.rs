@@ -12,9 +12,8 @@
 */
 
 use crate::{error::TvmError, types::Exception};
-use ton_types::{
-    error, fail, 
-    BuilderData, Cell, ExceptionCode, GasConsumer, MAX_DATA_BITS, Result, SliceData
+use tvm_types::{
+    error, fail, BuilderData, Cell, ExceptionCode, GasConsumer, Result, SliceData, MAX_DATA_BITS,
 };
 
 /// Pack data as a list of single-reference cells
@@ -38,10 +37,7 @@ pub fn pack_string_to_cell(string: &str, engine: &mut dyn GasConsumer) -> Result
 }
 
 /// Unpack data as a list of single-reference cells
-pub fn unpack_data_from_cell(
-    mut cell: SliceData, 
-    engine: &mut dyn GasConsumer,
-) -> Result<Vec<u8>> {
+pub fn unpack_data_from_cell(mut cell: SliceData, engine: &mut dyn GasConsumer) -> Result<Vec<u8>> {
     let mut data = vec![];
     loop {
         if cell.remaining_bits() % 8 != 0 {
@@ -54,10 +50,12 @@ pub fn unpack_data_from_cell(
         match cell.remaining_references() {
             0 => return Ok(data),
             1 => cell = engine.load_cell(cell.reference(0)?)?,
-            _ => return err!(
-                ExceptionCode::TypeCheckError,
-                "Incorrect representation of string in cells"
-            )
+            _ => {
+                return err!(
+                    ExceptionCode::TypeCheckError,
+                    "Incorrect representation of string in cells"
+                )
+            }
         }
     }
 }

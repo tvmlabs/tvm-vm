@@ -13,17 +13,17 @@
 
 use crate::{
     executor::math::DivMode,
-    stack::{StackItem, integer::IntegerData}
+    stack::{integer::IntegerData, StackItem},
 };
 use std::{fmt, ops::Range};
-use ton_types::{error, Result, SliceData};
+use tvm_types::{error, Result, SliceData};
 
 macro_rules! param {
     ($self:ident, $id:ident) => {{
         debug_assert!($self.params.len() < 3);
         for p in &$self.params {
             if let InstructionParameter::$id(x) = p {
-                return Some(*x)
+                return Some(*x);
             }
         }
         None
@@ -35,7 +35,7 @@ macro_rules! param_ref {
         debug_assert!($self.params.len() < 3);
         for p in &$self.params {
             if let InstructionParameter::$id(ref x) = p {
-                return Some(x)
+                return Some(x);
             }
         }
         None
@@ -47,33 +47,34 @@ macro_rules! param_ref_mut {
         debug_assert!($self.params.len() < 3);
         for p in &mut $self.params {
             if let InstructionParameter::$id(ref mut x) = p {
-                return Some(x)
+                return Some(x);
             }
         }
         None
     }};
 }
 
-pub(super) enum InstructionOptions {              // What will be set:
-    ArgumentConstraints,                          // Nargs, Pargs
-    ArgumentAndReturnConstraints,                 // Pargs, Rargs
-    BigInteger,                                   // BigInteger
-    Bytestring(usize, usize, usize, usize),       // byte aligned SliceData from code
-    ControlRegister,                              // ControlRegister
-    Dictionary(usize, usize),                     // SliceData with dictionary and Integer for index
-    DivisionMode,                                 // DivisionMode
-    Integer(Range<isize>),                        // Integer
-    Length(Range<usize>),                         // Length
-    LengthAndIndex,                               // LengthAndIndex
-    LengthMinusOne(Range<usize>),                 // Length
-    LengthMinusOneAndIndexMinusOne,               // LengthAndIndex
-    LengthMinusTwoAndIndex,                       // LengthAndIndex
-    Pargs(Range<usize>),                          // Pargs
-    Rargs(Range<usize>),                          // Rargs
-    Bitstring(usize, usize, usize, usize),        // SliceData from code
-    StackRegister(Range<usize>),                  // StackRegister
-    StackRegisterPair(WhereToGetParams),          // StackRegisterPair
-    StackRegisterTrio(WhereToGetParams),          // StackRegisterTrio
+pub(super) enum InstructionOptions {
+    // What will be set:
+    ArgumentConstraints,                    // Nargs, Pargs
+    ArgumentAndReturnConstraints,           // Pargs, Rargs
+    BigInteger,                             // BigInteger
+    Bytestring(usize, usize, usize, usize), // byte aligned SliceData from code
+    ControlRegister,                        // ControlRegister
+    Dictionary(usize, usize),               // SliceData with dictionary and Integer for index
+    DivisionMode,                           // DivisionMode
+    Integer(Range<isize>),                  // Integer
+    Length(Range<usize>),                   // Length
+    LengthAndIndex,                         // LengthAndIndex
+    LengthMinusOne(Range<usize>),           // Length
+    LengthMinusOneAndIndexMinusOne,         // LengthAndIndex
+    LengthMinusTwoAndIndex,                 // LengthAndIndex
+    Pargs(Range<usize>),                    // Pargs
+    Rargs(Range<usize>),                    // Rargs
+    Bitstring(usize, usize, usize, usize),  // SliceData from code
+    StackRegister(Range<usize>),            // StackRegister
+    StackRegisterPair(WhereToGetParams),    // StackRegisterPair
+    StackRegisterTrio(WhereToGetParams),    // StackRegisterTrio
 }
 
 #[derive(Debug, PartialEq)]
@@ -107,20 +108,20 @@ pub(super) enum InstructionParameter {
 #[derive(Debug)]
 pub(super) struct RegisterPair {
     pub(super) ra: usize,
-    pub(super) rb: usize
+    pub(super) rb: usize,
 }
 
 #[derive(Debug)]
 pub(super) struct RegisterTrio {
     pub(super) ra: usize,
     pub(super) rb: usize,
-    pub(super) rc: usize
+    pub(super) rc: usize,
 }
 
 #[derive(Debug)]
 pub(super) struct LengthAndIndex {
     pub(super) length: usize,
-    pub(super) index: usize
+    pub(super) index: usize,
 }
 
 pub(super) struct Instruction {
@@ -172,7 +173,7 @@ impl InstructionExt {
     fn name(&self) -> String {
         match self.proto.name_prefix {
             Some(prefix) => prefix.to_string() + self.proto.name,
-            None => self.proto.name.to_string()
+            None => self.proto.name.to_string(),
         }
     }
 
@@ -277,10 +278,14 @@ impl InstructionExt {
         self.vars.get_mut(index).unwrap()
     }
     pub(super) fn last_var(&self) -> Result<&StackItem> {
-        self.vars.last().ok_or_else(|| error!("no vars for {}", self.name()))
+        self.vars
+            .last()
+            .ok_or_else(|| error!("no vars for {}", self.name()))
     }
     pub(super) fn pop_var(&mut self) -> Result<StackItem> {
-        self.vars.pop().ok_or_else(|| error!("no vars for {}", self.name()))
+        self.vars
+            .pop()
+            .ok_or_else(|| error!("no vars for {}", self.name()))
     }
     pub(super) fn dump_with_params(&self) -> Option<String> {
         let mut trace = String::new();
@@ -289,20 +294,14 @@ impl InstructionExt {
         }
         trace += self.proto.name;
         trace += &match self.proto.opts {
-            Some(InstructionOptions::ArgumentAndReturnConstraints) =>
-                format!(" {}, {}",
-                    self.pargs_raw()?,
-                    self.rargs_raw()?
-                ),
-            Some(InstructionOptions::ArgumentConstraints) =>
-                format!(" {}, {}",
-                    self.pargs_raw()?,
-                    self.nargs_raw()?
-                ),
-            Some(InstructionOptions::BigInteger) =>
-                format!(" {}", self.biginteger_raw()?), // TODO: it is zero because execution withdraws it
-            Some(InstructionOptions::ControlRegister) =>
-                format!(" c{}", self.creg_raw()?),
+            Some(InstructionOptions::ArgumentAndReturnConstraints) => {
+                format!(" {}, {}", self.pargs_raw()?, self.rargs_raw()?)
+            }
+            Some(InstructionOptions::ArgumentConstraints) => {
+                format!(" {}, {}", self.pargs_raw()?, self.nargs_raw()?)
+            }
+            Some(InstructionOptions::BigInteger) => format!(" {}", self.biginteger_raw()?), // TODO: it is zero because execution withdraws it
+            Some(InstructionOptions::ControlRegister) => format!(" c{}", self.creg_raw()?),
             Some(InstructionOptions::DivisionMode) => {
                 let mode = self.division_mode();
                 if mode.shift_parameter() {
@@ -310,65 +309,66 @@ impl InstructionExt {
                 } else {
                     String::new()
                 }
-            },
-            Some(InstructionOptions::Integer(_)) =>
-                format!(" {}", self.integer_raw()?),
-            Some(InstructionOptions::Length(_)) |
-            Some(InstructionOptions::LengthMinusOne(_)) =>
-                format!(" {}", self.length_raw()?),
-            Some(InstructionOptions::LengthAndIndex) |
-            Some(InstructionOptions::LengthMinusOneAndIndexMinusOne) |
-            Some(InstructionOptions::LengthMinusTwoAndIndex) => {
+            }
+            Some(InstructionOptions::Integer(_)) => format!(" {}", self.integer_raw()?),
+            Some(InstructionOptions::Length(_)) | Some(InstructionOptions::LengthMinusOne(_)) => {
+                format!(" {}", self.length_raw()?)
+            }
+            Some(InstructionOptions::LengthAndIndex)
+            | Some(InstructionOptions::LengthMinusOneAndIndexMinusOne)
+            | Some(InstructionOptions::LengthMinusTwoAndIndex) => {
                 let length_and_index = self.length_and_index_raw()?;
                 format!(" {}, {}", length_and_index.length, length_and_index.index)
-            },
-            Some(InstructionOptions::Pargs(_)) =>
-                format!(" {}", self.pargs_raw()?),
-            Some(InstructionOptions::Rargs(_)) =>
-                format!(" {}", self.rargs_raw()?),
-            Some(InstructionOptions::StackRegister(_)) =>
-                format!(" s{}", self.sreg_raw()?),
-            Some(InstructionOptions::StackRegisterPair(WhereToGetParams::GetFromNextByteMinusOne)) =>
-                format!(" s{},s{}",
-                    self.sregs_raw()?.ra,
-                    self.sregs_raw()?.rb as isize - 1
-                ),
-            Some(InstructionOptions::StackRegisterPair(_)) =>
-                format!(" s{},s{}",
-                    self.sregs_raw()?.ra,
-                    self.sregs_raw()?.rb
-                ),
-            Some(InstructionOptions::StackRegisterTrio(WhereToGetParams::GetFromNextByteMinusOne)) =>
-                format!(" s{},s{},s{}",
-                    self.sregs3_raw()?.ra,
-                    self.sregs3_raw()?.rb,
-                    self.sregs3_raw()?.rc as isize - 1,
-                ),
-            Some(InstructionOptions::StackRegisterTrio(WhereToGetParams::GetFromNextByteMinusOneMinusOne)) =>
-                format!(" s{},s{},s{}",
-                    self.sregs3_raw()?.ra,
-                    self.sregs3_raw()?.rb as isize - 1,
-                    self.sregs3_raw()?.rc as isize - 1,
-                ),
-            Some(InstructionOptions::StackRegisterTrio(WhereToGetParams::GetFromNextByteMinusOneMinusTwo)) =>
-                format!(" s{},s{},s{}",
-                    self.sregs3_raw()?.ra,
-                    self.sregs3_raw()?.rb as isize - 1,
-                    self.sregs3_raw()?.rc as isize - 2,
-                ),
-            Some(InstructionOptions::StackRegisterTrio(_)) =>
-                format!(" s{},s{},s{}",
-                    self.sregs3_raw()?.ra,
-                    self.sregs3_raw()?.rb,
-                    self.sregs3_raw()?.rc,
-                ),
-            Some(InstructionOptions::Bitstring(_, _, _, _)) =>
-                format!(" x{:X}", self.slice_raw()?),
-            Some(InstructionOptions::Bytestring(_, _, _, _)) =>
-                format!(" x{:X}", self.slice_raw()?),
-            Some(InstructionOptions::Dictionary(_, _)) =>
-                format!(" {}", self.length_raw()?),
-            None => String::new()
+            }
+            Some(InstructionOptions::Pargs(_)) => format!(" {}", self.pargs_raw()?),
+            Some(InstructionOptions::Rargs(_)) => format!(" {}", self.rargs_raw()?),
+            Some(InstructionOptions::StackRegister(_)) => format!(" s{}", self.sreg_raw()?),
+            Some(InstructionOptions::StackRegisterPair(
+                WhereToGetParams::GetFromNextByteMinusOne,
+            )) => format!(
+                " s{},s{}",
+                self.sregs_raw()?.ra,
+                self.sregs_raw()?.rb as isize - 1
+            ),
+            Some(InstructionOptions::StackRegisterPair(_)) => {
+                format!(" s{},s{}", self.sregs_raw()?.ra, self.sregs_raw()?.rb)
+            }
+            Some(InstructionOptions::StackRegisterTrio(
+                WhereToGetParams::GetFromNextByteMinusOne,
+            )) => format!(
+                " s{},s{},s{}",
+                self.sregs3_raw()?.ra,
+                self.sregs3_raw()?.rb,
+                self.sregs3_raw()?.rc as isize - 1,
+            ),
+            Some(InstructionOptions::StackRegisterTrio(
+                WhereToGetParams::GetFromNextByteMinusOneMinusOne,
+            )) => format!(
+                " s{},s{},s{}",
+                self.sregs3_raw()?.ra,
+                self.sregs3_raw()?.rb as isize - 1,
+                self.sregs3_raw()?.rc as isize - 1,
+            ),
+            Some(InstructionOptions::StackRegisterTrio(
+                WhereToGetParams::GetFromNextByteMinusOneMinusTwo,
+            )) => format!(
+                " s{},s{},s{}",
+                self.sregs3_raw()?.ra,
+                self.sregs3_raw()?.rb as isize - 1,
+                self.sregs3_raw()?.rc as isize - 2,
+            ),
+            Some(InstructionOptions::StackRegisterTrio(_)) => format!(
+                " s{},s{},s{}",
+                self.sregs3_raw()?.ra,
+                self.sregs3_raw()?.rb,
+                self.sregs3_raw()?.rc,
+            ),
+            Some(InstructionOptions::Bitstring(_, _, _, _)) => format!(" x{:X}", self.slice_raw()?),
+            Some(InstructionOptions::Bytestring(_, _, _, _)) => {
+                format!(" x{:X}", self.slice_raw()?)
+            }
+            Some(InstructionOptions::Dictionary(_, _)) => format!(" {}", self.length_raw()?),
+            None => String::new(),
         };
         Some(trace)
     }
@@ -383,7 +383,7 @@ impl From<Instruction> for InstructionExt {
                 opts: proto.opts,
             },
             params: Vec::new(),
-            vars: Vec::new()
+            vars: Vec::new(),
         }
     }
 }

@@ -11,25 +11,26 @@
 * limitations under the License.
 */
 
+use crate::error::tvm_exception_code;
+use crate::executor::Mask;
 use crate::{
     error::TvmError,
     executor::{
-        engine::{storage::fetch_stack, Engine}, gas::gas_state::Gas, types::Instruction
+        engine::{storage::fetch_stack, Engine},
+        gas::gas_state::Gas,
+        types::Instruction,
     },
-    stack::StackItem, types::{Exception, Status},
-    utils::{
-        bytes_to_string, pack_data_to_cell, unpack_data_from_cell
-    }
+    stack::StackItem,
+    types::{Exception, Status},
+    utils::{bytes_to_string, pack_data_to_cell, unpack_data_from_cell},
 };
 use std::io::{Cursor, Read};
 use std::time::{Duration, Instant};
-use ton_block::GlobalCapabilities;
-use ton_types::{error, ExceptionCode, Result, SliceData};
-use crate::error::tvm_exception_code;
-use crate::executor::Mask;
+use tvm_block::GlobalCapabilities;
+use tvm_types::{error, ExceptionCode, Result, SliceData};
 
-const ZIP:          u8 = 0x01; // unzip before process and zip after process
-const BINARY:       u8 = 0x02; // use binary version functions instead of utf8
+const ZIP: u8 = 0x01; // unzip before process and zip after process
+const BINARY: u8 = 0x02; // use binary version functions instead of utf8
 const IGNORE_ERROR: u8 = 0x04; // ignore errors
 
 const DIFF_TIMEOUT: Duration = Duration::from_millis(300);
@@ -40,7 +41,7 @@ fn ignore_error(engine: &mut Engine, result: Status) -> Status {
         Err(err) => {
             let exception_code = tvm_exception_code(&err);
             if exception_code == Some(ExceptionCode::OutOfGas) {
-                return err!(ExceptionCode::OutOfGas)
+                return err!(ExceptionCode::OutOfGas);
             }
             engine.cc.stack.push(StackItem::None);
             Ok(())
@@ -48,7 +49,10 @@ fn ignore_error(engine: &mut Engine, result: Status) -> Status {
     }
 }
 
-fn get_two_slices_from_stack(engine: &mut Engine, name: &'static str) -> Result<(SliceData, SliceData)> {
+fn get_two_slices_from_stack(
+    engine: &mut Engine,
+    name: &'static str,
+) -> Result<(SliceData, SliceData)> {
     engine.load_instruction(Instruction::new(name))?;
     fetch_stack(engine, 2)?;
     let s0 = SliceData::load_cell_ref(engine.cmd.var(1).as_cell()?)?;
@@ -58,11 +62,7 @@ fn get_two_slices_from_stack(engine: &mut Engine, name: &'static str) -> Result<
 
 fn process_input_slice(s: SliceData, engine: &mut Engine, how: u8) -> Result<Vec<u8>> {
     let s = unpack_data_from_cell(s, engine)?;
-    let s = if how.bit(ZIP) {
-        unzip(engine, &s)?
-    } else {
-        s
-    };
+    let s = if how.bit(ZIP) { unzip(engine, &s)? } else { s };
     Ok(s)
 }
 
@@ -76,7 +76,7 @@ fn process_output_slice(s: &[u8], engine: &mut Engine, how: u8) -> Status {
     Ok(())
 }
 
-// Keep for experiments 
+// Keep for experiments
 fn _diff_diffy_lib(engine: &mut Engine, fst: &str, snd: &str) -> Result<String> {
     engine.try_use_gas(Gas::diff_fee_for_line(
         fst.lines().count(),
@@ -355,7 +355,11 @@ pub(super) fn execute_diff_patch_binary_not_quiet(engine: &mut Engine) -> Status
 
 /// DIFF_PATCH_BINARY_ZIPQ (s s – c), unpack message and diff, patch message and pack result
 pub(super) fn execute_diff_patch_binary_zip_quiet(engine: &mut Engine) -> Status {
-    execute_patch_with_options("DIFF_PATCH_BINARY_ZIPQ", engine, IGNORE_ERROR + BINARY + ZIP)
+    execute_patch_with_options(
+        "DIFF_PATCH_BINARY_ZIPQ",
+        engine,
+        IGNORE_ERROR + BINARY + ZIP,
+    )
 }
 
 /// DIFF_PATCH_BINARY_ZIP (s s – c), unpack message and diff, patch message and pack result

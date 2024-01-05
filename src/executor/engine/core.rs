@@ -12,29 +12,37 @@
 */
 
 use crate::{
-    error::{tvm_exception_full, TvmError, update_error_description},
+    error::{tvm_exception_full, update_error_description, TvmError},
     executor::{
-        continuation::{switch, switch_to_c0}, engine::handlers::Handlers,
-        gas::gas_state::Gas, math::DivMode, microcode::{VAR, CTRL},
+        continuation::{switch, switch_to_c0},
+        engine::handlers::Handlers,
+        gas::gas_state::Gas,
+        math::DivMode,
+        microcode::{CTRL, VAR},
         types::{
-            InstructionExt, Instruction, InstructionOptions, InstructionParameter, RegisterPair,
-            RegisterTrio, LengthAndIndex, WhereToGetParams,
-        }
-    },
-    stack::{
-        Stack, StackItem, continuation::{ContinuationData, ContinuationType},
-        integer::IntegerData, savelist::SaveList
+            Instruction, InstructionExt, InstructionOptions, InstructionParameter, LengthAndIndex,
+            RegisterPair, RegisterTrio, WhereToGetParams,
+        },
     },
     smart_contract_info::SmartContractInfo,
-    types::{Exception, ResultMut, ResultOpt, ResultRef, Status}
+    stack::{
+        continuation::{ContinuationData, ContinuationType},
+        integer::IntegerData,
+        savelist::SaveList,
+        Stack, StackItem,
+    },
+    types::{Exception, ResultMut, ResultOpt, ResultRef, Status},
 };
-use std::{sync::{Arc, Mutex}, ops::Range};
 use std::collections::{HashMap, HashSet};
-use ton_types::{
-    BuilderData, Cell, CellType, error, GasConsumer, Result, SliceData, HashmapE,
-    ExceptionCode, UInt256, IBitstring,
+use std::{
+    ops::Range,
+    sync::{Arc, Mutex},
 };
-use ton_block::{ShardAccount, Deserializable, GlobalCapabilities};
+use tvm_block::{Deserializable, GlobalCapabilities, ShardAccount};
+use tvm_types::{
+    error, BuilderData, Cell, CellType, ExceptionCode, GasConsumer, HashmapE, IBitstring, Result,
+    SliceData, UInt256,
+};
 
 pub(super) type ExecuteHandler = fn(&mut Engine) -> Status;
 
@@ -91,7 +99,7 @@ pub struct Engine {
     gas: Gas,
     code_page: isize,
     debug_on: isize, // status of debug can be recursively incremented
-    step: u32, // number of executable command
+    step: u32,       // number of executable command
     debug_buffer: String,
     cmd_code: SliceProto, // start of current cmd
     last_cmd: u8,
@@ -108,7 +116,7 @@ pub struct Engine {
 #[cfg(feature = "signature_no_check")]
 #[derive(Debug, Clone, Default)]
 pub struct BehaviorModifiers {
-    pub chksig_always_succeed: bool
+    pub chksig_always_succeed: bool,
 }
 
 #[cfg(not(feature = "signature_no_check"))]
@@ -137,7 +145,10 @@ pub struct EngineTraceInfo<'a> {
 
 impl<'a> EngineTraceInfo<'a> {
     pub fn has_cmd(&self) -> bool {
-        matches!(self.info_type, EngineTraceInfoType::Normal | EngineTraceInfoType::Implicit)
+        matches!(
+            self.info_type,
+            EngineTraceInfoType::Normal | EngineTraceInfoType::Implicit
+        )
     }
 }
 
@@ -145,7 +156,7 @@ impl<'a> EngineTraceInfo<'a> {
 pub struct CommittedState {
     c4: StackItem,
     c5: StackItem,
-    committed: bool
+    committed: bool,
 }
 
 impl CommittedState {
@@ -153,7 +164,7 @@ impl CommittedState {
         CommittedState {
             c4: StackItem::None,
             c5: StackItem::None,
-            committed: false
+            committed: false,
         }
     }
     pub fn with_params(c4: StackItem, c5: StackItem) -> CommittedState {
@@ -161,7 +172,7 @@ impl CommittedState {
             CommittedState {
                 c4,
                 c5,
-                committed: true
+                committed: true,
             }
         } else {
             debug_assert!(false);
@@ -200,23 +211,22 @@ lazy_static::lazy_static! {
 }
 
 impl Engine {
-
-    pub const TRACE_NONE:  u8 = 0x00;
-    pub const TRACE_CODE:  u8 = 0x01;
-    pub const TRACE_GAS:   u8 = 0x02;
+    pub const TRACE_NONE: u8 = 0x00;
+    pub const TRACE_CODE: u8 = 0x01;
+    pub const TRACE_GAS: u8 = 0x02;
     pub const TRACE_STACK: u8 = 0x04;
     pub const TRACE_CTRLS: u8 = 0x08;
-    pub const TRACE_ALL:   u8 = 0xFF;
+    pub const TRACE_ALL: u8 = 0xFF;
     pub const TRACE_ALL_BUT_CTRLS: u8 = 0x07;
 
-    pub (crate) const FLAG_COPYLEFTED: u64 = 0x01;
+    pub(crate) const FLAG_COPYLEFTED: u64 = 0x01;
 
     // External API ***********************************************************
 
     pub fn with_capabilities(capabilities: u64) -> Engine {
-        let trace = if cfg!(feature="fift_check") {
+        let trace = if cfg!(feature = "fift_check") {
             Engine::TRACE_ALL_BUT_CTRLS
-        } else if cfg!(feature="verbose") {
+        } else if cfg!(feature = "verbose") {
             Engine::TRACE_ALL
         } else {
             Engine::TRACE_NONE
@@ -228,9 +238,9 @@ impl Engine {
             || log::log_enabled!(target: "tvm", log::Level::Warn);
         let trace_callback: Option<Arc<TraceCallback>> = if !log_enabled {
             None
-        } else if cfg!(feature="fift_check") {
+        } else if cfg!(feature = "fift_check") {
             Some(Arc::new(Self::fift_trace_callback))
-        } else if cfg!(feature="verbose") {
+        } else if cfg!(feature = "verbose") {
             Some(Arc::new(Self::default_trace_callback))
         } else {
             Some(Arc::new(Self::simple_trace_callback))
@@ -349,11 +359,20 @@ impl Engine {
     }
 
     pub fn get_stack_result_fift(&self) -> String {
-        self.cc.stack.iter().map(|item| item.dump_as_fift()).collect::<Vec<_>>().join(" ")
+        self.cc
+            .stack
+            .iter()
+            .map(|item| item.dump_as_fift())
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 
     pub fn get_committed_state_fift(&self) -> String {
-        format!(" {} {}", self.cstate.c4.dump_as_fift(), self.cstate.c5.dump_as_fift())
+        format!(
+            " {} {}",
+            self.cstate.c4.dump_as_fift(),
+            self.cstate.c5.dump_as_fift()
+        )
     }
 
     pub fn commit(&mut self) {
@@ -372,8 +391,16 @@ impl Engine {
         if let Some(trace_callback) = self.trace_callback.as_ref() {
             // bigint param has been withdrawn during execution, so take it from the stack
             let cmd_str = if self.cmd.biginteger_raw().is_some() {
-                format!("{}{} {}", self.cmd.proto.name_prefix.unwrap_or_default(),
-                    self.cmd.proto.name, self.cc.stack.get(0).as_integer().unwrap_or(&IntegerData::default()))
+                format!(
+                    "{}{} {}",
+                    self.cmd.proto.name_prefix.unwrap_or_default(),
+                    self.cmd.proto.name,
+                    self.cc
+                        .stack
+                        .get(0)
+                        .as_integer()
+                        .unwrap_or(&IntegerData::default())
+                )
             } else if let Some(string) = log_string {
                 string
             } else if let Some(string) = self.cmd.dump_with_params() {
@@ -492,7 +519,7 @@ impl Engine {
                 StackItem::Integer(data) => match data.bitsize() {
                     Ok(0..=230) => data.to_string(),
                     Ok(bitsize) => format!("I{}", bitsize),
-                    Err(err) => err.to_string()
+                    Err(err) => err.to_string(),
                 },
                 StackItem::Cell(data) => {
                     format!("C{}-{}", data.bit_length(), data.references_count())
@@ -563,7 +590,7 @@ impl Engine {
         self.trace_info(EngineTraceInfoType::Start, 0, None);
         let result = loop {
             if let Some(result) = self.seek_next_cmd()? {
-                break result
+                break result;
             }
             let gas = self.gas_used();
             self.cmd_code = SliceProto::from(self.cc.code());
@@ -572,16 +599,17 @@ impl Engine {
                     self.basic_use_gas(8);
                     Some(err)
                 }
-                Ok(handler) => {
-                    match handler(self) {
-                        Err(e) => {
-                            Some(update_error_description(e, |e|
-                                format!("CMD: {}{} err: {}", self.cmd.proto.name_prefix.unwrap_or_default(), self.cmd.proto.name, e)
-                            ))
-                        }
-                        Ok(_) => self.gas.check_gas_remaining().err(),
-                    }
-                }
+                Ok(handler) => match handler(self) {
+                    Err(e) => Some(update_error_description(e, |e| {
+                        format!(
+                            "CMD: {}{} err: {}",
+                            self.cmd.proto.name_prefix.unwrap_or_default(),
+                            self.cmd.proto.name,
+                            e
+                        )
+                    })),
+                    Ok(_) => self.gas.check_gas_remaining().err(),
+                },
             };
             self.trace_info(EngineTraceInfoType::Normal, gas, None);
             self.cmd.clear();
@@ -593,7 +621,11 @@ impl Engine {
                 }
             }
         };
-        self.trace_info(EngineTraceInfoType::Finish, self.gas_used(), Some("NORMAL TERMINATION".to_string()));
+        self.trace_info(
+            EngineTraceInfoType::Finish,
+            self.gas_used(),
+            Some("NORMAL TERMINATION".to_string()),
+        );
         self.commit();
         Ok(result)
     }
@@ -611,7 +643,7 @@ impl Engine {
         self.log_string = Some("implicit RET");
         self.try_use_gas(Gas::implicit_ret_price())?;
         if self.ctrls.get(0).is_none() {
-            return Ok(Some(0))
+            return Ok(Some(0));
         }
         switch_to_c0(self)?;
         Ok(None)
@@ -639,7 +671,7 @@ impl Engine {
         // revert stack depth to the state before try-catch
         let cur_depth = self.cc.stack.depth();
         if cur_depth < depth as usize {
-            return err!(ExceptionCode::StackUnderflow)
+            return err!(ExceptionCode::StackUnderflow);
         }
         self.cc.stack.drop_top(cur_depth - depth as usize);
         // restore exception pair
@@ -657,7 +689,8 @@ impl Engine {
                 let mut cond = ContinuationData::with_code(cond);
                 let mut while_ = ContinuationData::move_without_stack(&mut self.cc, body);
                 while_.savelist.put_opt(0, self.ctrl_mut(0)?);
-                cond.savelist.put_opt(0, &mut StackItem::continuation(while_));
+                cond.savelist
+                    .put_opt(0, &mut StackItem::continuation(while_));
                 self.ctrls.put_opt(0, &mut StackItem::continuation(cond));
             }
             Ok(false) => {
@@ -667,9 +700,12 @@ impl Engine {
             Err(err) => {
                 if self.check_capabilities(GlobalCapabilities::CapsTvmBugfixes2022 as u64) {
                     let quit = ContinuationType::Quit(ExceptionCode::NormalTermination as i32);
-                    self.ctrls.put(0, &mut StackItem::continuation(ContinuationData::with_type(quit)))?;
+                    self.ctrls.put(
+                        0,
+                        &mut StackItem::continuation(ContinuationData::with_type(quit)),
+                    )?;
                 }
-                return Err(err)
+                return Err(err);
             }
         }
         Ok(None)
@@ -703,7 +739,7 @@ impl Engine {
                 self.log_string = Some("RET FROM UNTIL");
                 switch(self, ctrl!(0))?;
             }
-            Err(err) => return Err(err)
+            Err(err) => return Err(err),
         }
         Ok(None)
     }
@@ -716,26 +752,34 @@ impl Engine {
     }
 
     fn discharge_nargs(&mut self) {
-        if self.check_capabilities(GlobalCapabilities::CapsTvmBugfixes2022 as u64) && self.cc.nargs != -1 {
+        if self.check_capabilities(GlobalCapabilities::CapsTvmBugfixes2022 as u64)
+            && self.cc.nargs != -1
+        {
             let depth = self.cc.stack.depth();
-            let _ = self.cc.stack.drop_range_straight((depth - self.cc.nargs as usize)..depth);
+            let _ = self
+                .cc
+                .stack
+                .drop_range_straight((depth - self.cc.nargs as usize)..depth);
             self.cc.nargs = -1;
         }
     }
 
     fn make_external_error(&mut self) -> Result<Option<i32>> {
         let number = self.cc.stack.drop(0)?.as_integer()?.into(0..=0xffff)?;
-        if number == ExceptionCode::NormalTermination as usize ||
-            number == ExceptionCode::AlternativeTermination as usize {
-            return Ok(Some(number as i32))
+        if number == ExceptionCode::NormalTermination as usize
+            || number == ExceptionCode::AlternativeTermination as usize
+        {
+            return Ok(Some(number as i32));
         }
         let value = match self.cc.stack.drop(0) {
             Ok(item) => item.as_integer().cloned().unwrap_or_default(),
-            Err(_) => IntegerData::zero()
+            Err(_) => IntegerData::zero(),
         };
         let exception = match ExceptionCode::from_usize(number) {
             Some(code) => Exception::from_code_and_value(code, value, file!(), line!()),
-            None => Exception::from_number_and_value(number, StackItem::int(value), file!(), line!())
+            None => {
+                Exception::from_number_and_value(number, StackItem::int(value), file!(), line!())
+            }
         };
         Err(error!(TvmError::TvmExceptionFull(exception, String::new())))
     }
@@ -753,7 +797,9 @@ impl Engine {
                     ContinuationType::PushInt(code) => self.step_pushint(code),
                     ContinuationType::Quit(exit_code) => Ok(Some(exit_code)),
                     ContinuationType::TryCatch => self.step_try_catch(),
-                    ContinuationType::WhileLoopCondition(body, cond) => self.step_while_loop(body, cond),
+                    ContinuationType::WhileLoopCondition(body, cond) => {
+                        self.step_while_loop(body, cond)
+                    }
                     ContinuationType::RepeatLoopBody(code, _counter) => self.step_repeat_loop(code),
                     ContinuationType::UntilLoopCondition(body) => self.step_until_loop(body),
                     ContinuationType::AgainLoopBody(slice) => self.step_again_loop(slice),
@@ -763,7 +809,11 @@ impl Engine {
             };
             if self.is_trace_enabled() {
                 if let Some(log_string) = self.log_string {
-                    self.trace_info(EngineTraceInfoType::Implicit, gas, Some(log_string.to_string()));
+                    self.trace_info(
+                        EngineTraceInfoType::Implicit,
+                        gas,
+                        Some(log_string.to_string()),
+                    );
                 }
             }
             match self.gas.check_gas_remaining().and(result) {
@@ -774,7 +824,7 @@ impl Engine {
                         match self.raise_exception_bugfix0(err) {
                             Ok(Some(exit_code)) => return Ok(Some(exit_code)),
                             Ok(None) => (),
-                            Err(err) => return Err(err)
+                            Err(err) => return Err(err),
                         }
                     } else {
                         self.raise_exception(err)?
@@ -785,7 +835,6 @@ impl Engine {
         Ok(None)
     }
 
-
     pub fn load_library_cell(&mut self, cell: Cell) -> Result<Cell> {
         self.check_capability(GlobalCapabilities::CapSetLibCode)?;
         let mut hash = SliceData::load_cell(cell)?;
@@ -794,12 +843,20 @@ impl Engine {
             if let Some(lib_bucket) = library.get_with_gas(hash.clone(), self)? {
                 let lib = lib_bucket.reference(0)?;
                 if lib.repr_hash() != hash {
-                    return err!(ExceptionCode::DictionaryError, "Librariy hash does not correspond to map key {:x}", hash)
+                    return err!(
+                        ExceptionCode::DictionaryError,
+                        "Librariy hash does not correspond to map key {:x}",
+                        hash
+                    );
                 }
                 return Ok(lib);
             }
         }
-        err!(ExceptionCode::CellUnderflow, "Libraries do not contain code with hash {:x}", hash)
+        err!(
+            ExceptionCode::CellUnderflow,
+            "Libraries do not contain code with hash {:x}",
+            hash
+        )
     }
 
     /// Loads cell to slice checking in precashed map
@@ -839,9 +896,9 @@ impl Engine {
                             return err!(
                                 ExceptionCode::CellUnderflow,
                                 "hash of merkle proof cell is not corresponded to child cell"
-                            )
+                            );
                         }
-                        continue
+                        continue;
                     }
                 }
                 CellType::MerkleUpdate => {
@@ -854,7 +911,7 @@ impl Engine {
                             return err!(
                                 ExceptionCode::CellUnderflow,
                                 "hash of merkle update cell is not corresponded to child cell"
-                            )
+                            );
                         }
                         slice.move_by(16)?;
                         let hash = slice.get_next_hash()?;
@@ -863,14 +920,18 @@ impl Engine {
                             return err!(
                                 ExceptionCode::CellUnderflow,
                                 "hash of merkle update cell is not corresponded to child cell"
-                            )
+                            );
                         }
-                        continue
+                        continue;
                     }
                 }
-                _ => ()
+                _ => (),
             }
-            return err!(ExceptionCode::CellUnderflow, "Wrong resolving cell type {}", cell.cell_type())
+            return err!(
+                ExceptionCode::CellUnderflow,
+                "Wrong resolving cell type {}",
+                cell.cell_type()
+            );
         };
         for hash in previous_hashes {
             self.visited_exotic_cells.insert(hash, slice.clone());
@@ -897,12 +958,14 @@ impl Engine {
     }
 
     pub fn ctrl(&self, index: usize) -> ResultRef<StackItem> {
-        self.ctrls.get(index)
+        self.ctrls
+            .get(index)
             .ok_or_else(|| exception!(ExceptionCode::RangeCheckError, "get ctrl {} failed", index))
     }
 
     pub fn ctrl_mut(&mut self, index: usize) -> ResultMut<StackItem> {
-        self.ctrls.get_mut(index)
+        self.ctrls
+            .get_mut(index)
             .ok_or_else(|| exception!(ExceptionCode::RangeCheckError, "get ctrl {} failed", index))
     }
 
@@ -915,33 +978,56 @@ impl Engine {
     }
 
     fn dump_msg(message: &'static str, data: String) -> String {
-        format!("--- {} {:-<4$}\n{}\n{:-<40}\n", message, "", data, "", 35-message.len())
+        format!(
+            "--- {} {:-<4$}\n{}\n{:-<40}\n",
+            message,
+            "",
+            data,
+            "",
+            35 - message.len()
+        )
     }
 
     pub fn dump_ctrls(&self, short: bool) -> String {
-        Self::dump_msg("Control registers", SaveList::REGS.iter()
-            .filter_map(|i| self.ctrls.get(*i).map(|item| if !short {
-                format!("{}: {}", i, item)
-            } else if *i == 3 {
-                "3: copy of CC".to_string()
-            } else if *i == 7 {
-                "7: SmartContractInfo".to_string()
-            } else if let StackItem::Continuation(x) = item {
-                format!("{}: {:?}", i, x.type_of)
-            } else {
-                format!("{}: {}", i, item.dump_as_fift())
-            })).collect::<Vec<_>>().join("\n")
+        Self::dump_msg(
+            "Control registers",
+            SaveList::REGS
+                .iter()
+                .filter_map(|i| {
+                    self.ctrls.get(*i).map(|item| {
+                        if !short {
+                            format!("{}: {}", i, item)
+                        } else if *i == 3 {
+                            "3: copy of CC".to_string()
+                        } else if *i == 7 {
+                            "7: SmartContractInfo".to_string()
+                        } else if let StackItem::Continuation(x) = item {
+                            format!("{}: {:?}", i, x.type_of)
+                        } else {
+                            format!("{}: {}", i, item.dump_as_fift())
+                        }
+                    })
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
         )
     }
 
     pub fn dump_stack(&self, message: &'static str, short: bool) -> String {
-        Self::dump_msg(message, self.cc.stack.iter()
-            .map(|item| if !short {
-                format!("{}", item)
-            } else {
-                item.dump_as_fift()
-            })
-            .collect::<Vec<_>>().join("\n")
+        Self::dump_msg(
+            message,
+            self.cc
+                .stack
+                .iter()
+                .map(|item| {
+                    if !short {
+                        format!("{}", item)
+                    } else {
+                        item.dump_as_fift()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
         )
     }
 
@@ -954,7 +1040,10 @@ impl Engine {
         self.trace = trace_mask
     }
 
-    pub fn set_trace_callback(&mut self, callback: impl Fn(&Engine, &EngineTraceInfo) + Send + Sync + 'static) {
+    pub fn set_trace_callback(
+        &mut self,
+        callback: impl Fn(&Engine, &EngineTraceInfo) + Send + Sync + 'static,
+    ) {
         self.trace_callback = Some(Arc::new(callback));
     }
 
@@ -978,7 +1067,13 @@ impl Engine {
         self.modifiers = modifiers;
     }
 
-    pub fn setup(self, code: SliceData, ctrls: Option<SaveList>, stack: Option<Stack>, gas: Option<Gas>) -> Self {
+    pub fn setup(
+        self,
+        code: SliceData,
+        ctrls: Option<SaveList>,
+        stack: Option<Stack>,
+        gas: Option<Gas>,
+    ) -> Self {
         self.setup_with_libraries(code, ctrls, stack, gas, vec![])
     }
 
@@ -988,7 +1083,7 @@ impl Engine {
         mut ctrls: Option<SaveList>,
         stack: Option<Stack>,
         gas: Option<Gas>,
-        libraries: Vec<HashmapE>
+        libraries: Vec<HashmapE>,
     ) -> Self {
         *self.cc.code_mut() = code.clone();
         self.cmd_code = SliceProto::from(self.cc.code());
@@ -997,16 +1092,47 @@ impl Engine {
         }
         self.gas = gas.unwrap_or_else(Gas::test);
         let cont = ContinuationType::Quit(ExceptionCode::NormalTermination as i32);
-        self.ctrls.put(0, &mut StackItem::continuation(ContinuationData::with_type(cont))).unwrap();
+        self.ctrls
+            .put(
+                0,
+                &mut StackItem::continuation(ContinuationData::with_type(cont)),
+            )
+            .unwrap();
         let cont = ContinuationType::Quit(ExceptionCode::AlternativeTermination as i32);
-        self.ctrls.put(1, &mut StackItem::continuation(ContinuationData::with_type(cont))).unwrap();
+        self.ctrls
+            .put(
+                1,
+                &mut StackItem::continuation(ContinuationData::with_type(cont)),
+            )
+            .unwrap();
         if self.check_capabilities(GlobalCapabilities::CapsTvmBugfixes2022 as u64) {
-            self.ctrls.put(2, &mut StackItem::continuation(ContinuationData::with_type(ContinuationType::ExcQuit))).unwrap();
+            self.ctrls
+                .put(
+                    2,
+                    &mut StackItem::continuation(ContinuationData::with_type(
+                        ContinuationType::ExcQuit,
+                    )),
+                )
+                .unwrap();
         }
-        self.ctrls.put(3, &mut StackItem::continuation(ContinuationData::with_code(code.clone()))).unwrap();
-        self.ctrls.put(4, &mut StackItem::cell(Cell::default())).unwrap();
-        self.ctrls.put(5, &mut StackItem::cell(Cell::default())).unwrap();
-        self.ctrls.put(7, &mut SmartContractInfo::old_default(code.into_cell()).into_temp_data_item()).unwrap();
+        self.ctrls
+            .put(
+                3,
+                &mut StackItem::continuation(ContinuationData::with_code(code.clone())),
+            )
+            .unwrap();
+        self.ctrls
+            .put(4, &mut StackItem::cell(Cell::default()))
+            .unwrap();
+        self.ctrls
+            .put(5, &mut StackItem::cell(Cell::default()))
+            .unwrap();
+        self.ctrls
+            .put(
+                7,
+                &mut SmartContractInfo::old_default(code.into_cell()).into_temp_data_item(),
+            )
+            .unwrap();
         if let Some(ref mut ctrls) = ctrls {
             self.ctrls.apply(ctrls);
         }
@@ -1033,7 +1159,7 @@ impl Engine {
     }
 
     pub(in crate::executor) fn switch_debug(&mut self, on_off: bool) {
-        self.debug_on += if on_off {1} else {-1}
+        self.debug_on += if on_off { 1 } else { -1 }
     }
 
     pub(in crate::executor) fn debug(&self) -> bool {
@@ -1080,11 +1206,18 @@ impl Engine {
         Ok(!self.check_while_loop_condition()?)
     }
 
-    fn extract_slice(&mut self, offset: usize, r: usize, x: usize, mut refs: usize, mut bytes: usize) -> Result<SliceData> {
+    fn extract_slice(
+        &mut self,
+        offset: usize,
+        r: usize,
+        x: usize,
+        mut refs: usize,
+        mut bytes: usize,
+    ) -> Result<SliceData> {
         let mut code = self.cmd_code()?;
         let mut slice = code.clone();
         if offset >= slice.remaining_bits() {
-            return err!(ExceptionCode::InvalidOpcode)
+            return err!(ExceptionCode::InvalidOpcode);
         }
         slice.shrink_data(offset..);
         if r != 0 {
@@ -1096,8 +1229,10 @@ impl Engine {
         let mut shift = 8 * bytes + offset + r + x + 7;
         let remainder = shift % 8;
         shift -= remainder;
-        if (slice.remaining_bits() < shift - r - x - offset) || (slice.remaining_references() < refs) {
-            return err!(ExceptionCode::InvalidOpcode)
+        if (slice.remaining_bits() < shift - r - x - offset)
+            || (slice.remaining_references() < refs)
+        {
+            return err!(ExceptionCode::InvalidOpcode);
         }
         code.shrink_data(shift..);
         code.shrink_references(refs..);
@@ -1119,45 +1254,45 @@ impl Engine {
             Some(InstructionOptions::ArgumentConstraints) => {
                 let param = self.next_cmd()?;
                 self.basic_use_gas(0);
-                self.cmd.params.push(
-                    InstructionParameter::Pargs(((param >> 4) & 0x0F) as usize)
-                );
-                self.cmd.params.push(
-                    InstructionParameter::Nargs(
-                        if (param & 0x0F) == 15 {
-                            -1
-                        } else {
-                            (param & 0x0F) as isize
-                        }
-                    )
-                )
-            },
+                self.cmd
+                    .params
+                    .push(InstructionParameter::Pargs(((param >> 4) & 0x0F) as usize));
+                self.cmd
+                    .params
+                    .push(InstructionParameter::Nargs(if (param & 0x0F) == 15 {
+                        -1
+                    } else {
+                        (param & 0x0F) as isize
+                    }))
+            }
             Some(InstructionOptions::ArgumentAndReturnConstraints) => {
                 let param = self.next_cmd()?;
                 self.basic_use_gas(0);
-                self.cmd.params.push(
-                    InstructionParameter::Pargs(((param >> 4) & 0x0F) as usize)
-                );
-                self.cmd.params.push(
-                    InstructionParameter::Rargs((param & 0x0F) as usize)
-                )
-            },
+                self.cmd
+                    .params
+                    .push(InstructionParameter::Pargs(((param >> 4) & 0x0F) as usize));
+                self.cmd
+                    .params
+                    .push(InstructionParameter::Rargs((param & 0x0F) as usize))
+            }
             Some(InstructionOptions::BigInteger) => {
                 self.basic_use_gas(5);
 
                 let bigint = IntegerData::from_big_endian_octet_stream(|| self.next_cmd())?;
-                self.cmd.params.push(InstructionParameter::BigInteger(bigint))
+                self.cmd
+                    .params
+                    .push(InstructionParameter::BigInteger(bigint))
             }
             Some(InstructionOptions::ControlRegister) => {
                 self.basic_use_gas(0);
                 let creg = (self.last_cmd() & 0x0F) as usize;
                 if !SaveList::REGS.contains(&creg) {
-                    return err!(ExceptionCode::RangeCheckError)
+                    return err!(ExceptionCode::RangeCheckError);
                 }
-                self.cmd.params.push(
-                    InstructionParameter::ControlRegister(creg)
-                )
-            },
+                self.cmd
+                    .params
+                    .push(InstructionParameter::ControlRegister(creg))
+            }
             Some(InstructionOptions::DivisionMode) => {
                 let mode = DivMode::with_flags(self.next_cmd()?);
                 if mode.shift_parameter() {
@@ -1166,8 +1301,10 @@ impl Engine {
                 }
                 self.basic_use_gas(0);
                 self.cmd.proto.name = mode.command_name()?;
-                self.cmd.params.push(InstructionParameter::DivisionMode(mode));
-            },
+                self.cmd
+                    .params
+                    .push(InstructionParameter::DivisionMode(mode));
+            }
             Some(InstructionOptions::Integer(ref range)) => {
                 let number = if *range == (-32768..32768) {
                     self.basic_use_gas(16);
@@ -1179,7 +1316,7 @@ impl Engine {
                     self.basic_use_gas(0);
                     match self.last_cmd() & 0x0F {
                         value @ 0..=10 => value as isize,
-                        value => value as isize - 16
+                        value => value as isize - 16,
                     }
                 } else if *range == (0..32) {
                     self.basic_use_gas(0);
@@ -1204,13 +1341,13 @@ impl Engine {
                     self.basic_use_gas(0);
                     match self.last_cmd() & 0x0F {
                         15 => return err!(ExceptionCode::RangeCheckError),
-                        value => value as isize
+                        value => value as isize,
                     }
                 } else if *range == (1..15) {
                     self.basic_use_gas(0);
                     match self.last_cmd() & 0x0F {
                         0 | 15 => return err!(ExceptionCode::RangeCheckError),
-                        value => value as isize
+                        value => value as isize,
                     }
                 } else if *range == (-15..240) {
                     self.basic_use_gas(0);
@@ -1219,116 +1356,112 @@ impl Engine {
                         value @ 0xF1..=0xFF => value as isize - 256,
                     }
                 } else {
-                    return err!(ExceptionCode::RangeCheckError)
+                    return err!(ExceptionCode::RangeCheckError);
                 };
                 self.cmd.params.push(InstructionParameter::Integer(number))
-            },
+            }
             Some(InstructionOptions::Length(ref range)) => {
                 if *range == (0..16) {
-                    self.cmd.params.push(
-                        InstructionParameter::Length((self.last_cmd() & 0x0F) as usize)
-                    )
+                    self.cmd.params.push(InstructionParameter::Length(
+                        (self.last_cmd() & 0x0F) as usize,
+                    ))
                 } else if *range == (0..4) {
                     let length = self.last_cmd() & 3;
-                    self.cmd.params.push(InstructionParameter::Length(length as usize))
+                    self.cmd
+                        .params
+                        .push(InstructionParameter::Length(length as usize))
                 } else if *range == (1..32) {
                     let length = self.last_cmd() & 0x1F;
-                    self.cmd.params.push(InstructionParameter::Length(length as usize))
-                }
-                else {
-                    return err!(ExceptionCode::RangeCheckError)
+                    self.cmd
+                        .params
+                        .push(InstructionParameter::Length(length as usize))
+                } else {
+                    return err!(ExceptionCode::RangeCheckError);
                 }
                 self.basic_use_gas(0);
-            },
+            }
             Some(InstructionOptions::LengthAndIndex) => {
                 self.basic_use_gas(0);
                 // This is currently needed only for special-case BLKPUSH command and works the same way
                 // as InstructionOptions::StackRegisterPair(WhereToGetParams::GetFromLastByte)
                 let params = self.last_cmd();
                 let (length, index) = (params >> 4, params & 0x0F);
-                self.cmd.params.push(
-                    InstructionParameter::LengthAndIndex(
-                        LengthAndIndex {
-                            length: length as usize,
-                            index: index as usize
-                        }
-                    )
-                )
-            },
+                self.cmd
+                    .params
+                    .push(InstructionParameter::LengthAndIndex(LengthAndIndex {
+                        length: length as usize,
+                        index: index as usize,
+                    }))
+            }
             Some(InstructionOptions::LengthMinusOne(ref range)) => {
                 let len = if *range == (0..8) {
                     self.last_cmd() & 0x07
                 } else if *range == (0..256) {
                     self.next_cmd()?
                 } else {
-                    return err!(ExceptionCode::RangeCheckError)
-                } as usize + 1;
-                self.cmd.params.push(
-                    InstructionParameter::Length(len)
-                );
+                    return err!(ExceptionCode::RangeCheckError);
+                } as usize
+                    + 1;
+                self.cmd.params.push(InstructionParameter::Length(len));
                 self.basic_use_gas(0);
-            },
+            }
             Some(InstructionOptions::LengthMinusOneAndIndexMinusOne) => {
                 let params = self.next_cmd()?;
                 self.basic_use_gas(0);
                 let (l_minus_1, i_minus_1) = (params >> 4, params & 0x0F);
-                self.cmd.params.push(
-                    InstructionParameter::LengthAndIndex(
-                        LengthAndIndex {
-                            length: (l_minus_1 + 1) as usize,
-                            index: (i_minus_1 + 1) as usize
-                        }
-                    )
-                )
-            },
+                self.cmd
+                    .params
+                    .push(InstructionParameter::LengthAndIndex(LengthAndIndex {
+                        length: (l_minus_1 + 1) as usize,
+                        index: (i_minus_1 + 1) as usize,
+                    }))
+            }
             Some(InstructionOptions::LengthMinusTwoAndIndex) => {
                 let params = self.next_cmd()?;
                 self.basic_use_gas(0);
                 let (l_minus_2, i) = (params >> 4, params & 0x0F);
-                self.cmd.params.push(
-                    InstructionParameter::LengthAndIndex(
-                        LengthAndIndex {
-                            length: (l_minus_2 + 2) as usize,
-                            index: i as usize
-                        }
-                    )
-                )
-            },
+                self.cmd
+                    .params
+                    .push(InstructionParameter::LengthAndIndex(LengthAndIndex {
+                        length: (l_minus_2 + 2) as usize,
+                        index: i as usize,
+                    }))
+            }
             Some(InstructionOptions::Pargs(ref range)) => {
                 if *range == (0..16) {
-                    self.cmd.params.push(
-                        InstructionParameter::Pargs((self.last_cmd() & 0x0F) as usize)
-                    )
+                    self.cmd.params.push(InstructionParameter::Pargs(
+                        (self.last_cmd() & 0x0F) as usize,
+                    ))
                 } else {
-                    return err!(ExceptionCode::RangeCheckError)
+                    return err!(ExceptionCode::RangeCheckError);
                 }
                 self.basic_use_gas(0);
-            },
+            }
             Some(InstructionOptions::Rargs(ref range)) => {
                 if *range == (0..16) {
-                    self.cmd.params.push(
-                        InstructionParameter::Rargs((self.last_cmd() & 0x0F) as usize)
-                    )
+                    self.cmd.params.push(InstructionParameter::Rargs(
+                        (self.last_cmd() & 0x0F) as usize,
+                    ))
                 } else {
-                    return err!(ExceptionCode::RangeCheckError)
+                    return err!(ExceptionCode::RangeCheckError);
                 }
                 self.basic_use_gas(0);
-            },
+            }
             Some(InstructionOptions::StackRegister(ref range)) => {
                 if *range == (0..16) {
-                    self.cmd.params.push(
-                        InstructionParameter::StackRegister((self.last_cmd() & 0x0F) as usize)
-                    )
+                    self.cmd.params.push(InstructionParameter::StackRegister(
+                        (self.last_cmd() & 0x0F) as usize,
+                    ))
                 } else if *range == (0..256) {
                     let reg = self.next_cmd()? as usize;
-                    self.cmd.params.push(
-                        InstructionParameter::StackRegister(reg)
-                    )
+                    self.cmd
+                        .params
+                        .push(InstructionParameter::StackRegister(reg))
                 } else {
-                    return err!(ExceptionCode::RangeCheckError)
+                    return err!(ExceptionCode::RangeCheckError);
                 }
                 self.basic_use_gas(0);
-            },
+            }
             Some(InstructionOptions::StackRegisterPair(ref place)) => {
                 let (ra, rb) = match place {
                     WhereToGetParams::GetFromLastByte2Bits => {
@@ -1345,20 +1478,18 @@ impl Engine {
                     }
                     WhereToGetParams::GetFromNextByteLong => {
                         let rb = self.next_cmd()?;
-                        (0,rb)
+                        (0, rb)
                     }
-                    _ => (0, 0)
+                    _ => (0, 0),
                 };
                 self.basic_use_gas(0);
-                self.cmd.params.push(
-                    InstructionParameter::StackRegisterPair(
-                        RegisterPair {
-                            ra: ra as usize,
-                            rb: rb as usize
-                        }
-                    )
-                )
-            },
+                self.cmd
+                    .params
+                    .push(InstructionParameter::StackRegisterPair(RegisterPair {
+                        ra: ra as usize,
+                        rb: rb as usize,
+                    }))
+            }
             Some(InstructionOptions::StackRegisterTrio(ref place)) => {
                 let last = self.last_cmd();
                 let (ra, rb, rc) = match place {
@@ -1376,15 +1507,13 @@ impl Engine {
                     }
                 };
                 self.basic_use_gas(0);
-                self.cmd.params.push(
-                    InstructionParameter::StackRegisterTrio(
-                        RegisterTrio {
-                            ra: ra as usize,
-                            rb: rb as usize,
-                            rc: rc as usize
-                        }
-                    )
-                )
+                self.cmd
+                    .params
+                    .push(InstructionParameter::StackRegisterTrio(RegisterTrio {
+                        ra: ra as usize,
+                        rb: rb as usize,
+                        rc: rc as usize,
+                    }))
             }
             Some(InstructionOptions::Dictionary(offset, bits)) => {
                 self.use_gas(Gas::basic_gas_price(offset + 1 + bits, 0));
@@ -1401,7 +1530,7 @@ impl Engine {
                 self.use_gas(Gas::basic_gas_price(offset + r + x, 0));
                 let slice = self.extract_slice(offset, r, x, 0, bytes)?;
                 if slice.remaining_bits() % 8 != 0 {
-                    return err!(ExceptionCode::InvalidOpcode)
+                    return err!(ExceptionCode::InvalidOpcode);
                 }
                 self.cmd.params.push(InstructionParameter::Slice(slice))
             }
@@ -1411,7 +1540,9 @@ impl Engine {
                 slice.trim_right();
                 self.cmd.params.push(InstructionParameter::Slice(slice));
             }
-            None => { self.basic_use_gas(0); }
+            None => {
+                self.basic_use_gas(0);
+            }
         }
         Ok(())
     }
@@ -1423,7 +1554,7 @@ impl Engine {
             Some(exception) => exception,
             None => {
                 log::trace!(target: "tvm", "BAD CODE: {}\n", self.cmd_code_string());
-                return Err(err)
+                return Err(err);
             }
         };
         if exception.exception_code().is_some() {
@@ -1431,7 +1562,7 @@ impl Engine {
         }
         if exception.exception_code() == Some(ExceptionCode::OutOfGas) {
             log::trace!(target: "tvm", "OUT OF GAS CODE: {}\n", self.cmd_code_string());
-            return Err(err)
+            return Err(err);
         }
         if let Err(err) = self.gas.try_use_gas(Gas::exception_price()) {
             self.step += 1;
@@ -1441,7 +1572,9 @@ impl Engine {
         // self.trace_info(EngineTraceInfoType::Exception, self.gas_used(), Some(format!("EXCEPTION: {}", err)));
         if let Some(c2) = self.ctrls.get_mut(2) {
             self.cc.stack.push(exception.value.clone());
-            self.cc.stack.push(int!(exception.exception_or_custom_code()));
+            self.cc
+                .stack
+                .push(int!(exception.exception_or_custom_code()));
             c2.as_continuation_mut()?.nargs = 2;
             switch(self, ctrl!(2))?;
         } else if let Some(number) = exception.is_normal_termination() {
@@ -1453,7 +1586,7 @@ impl Engine {
         } else {
             let log_string = Some(format!("UNHANDLED EXCEPTION: {}", err));
             self.trace_info(EngineTraceInfoType::Exception, self.gas_used(), log_string);
-            return Err(err)
+            return Err(err);
         }
         Ok(())
     }
@@ -1465,7 +1598,7 @@ impl Engine {
             Some(exception) => exception,
             None => {
                 log::trace!(target: "tvm", "BAD CODE: {}\n", self.cmd_code_string());
-                return Err(err)
+                return Err(err);
             }
         };
         if exception.exception_code().is_some() {
@@ -1473,7 +1606,7 @@ impl Engine {
         }
         if exception.exception_code() == Some(ExceptionCode::OutOfGas) {
             log::trace!(target: "tvm", "OUT OF GAS CODE: {}\n", self.cmd_code_string());
-            return Err(err)
+            return Err(err);
         }
         if let Err(err) = self.gas.try_use_gas(Gas::exception_price()) {
             self.step += 1;
@@ -1490,25 +1623,29 @@ impl Engine {
                     self.cc.stack.push(exception.value);
                     self.cmd.vars[n].as_continuation_mut()?.nargs = 1;
                     switch(self, var!(n))?;
-                    return Ok(None)
+                    return Ok(None);
                 } else {
                     self.cc.stack = Stack::new();
                     self.cc.stack.push(exception.value.clone());
-                    self.cc.stack.push(int!(exception.exception_or_custom_code()));
-                    return Err(error!(TvmError::TvmExceptionFull(exception, String::new())))
+                    self.cc
+                        .stack
+                        .push(int!(exception.exception_or_custom_code()));
+                    return Err(error!(TvmError::TvmExceptionFull(exception, String::new())));
                 }
             }
         }
         self.cmd.push_var(c2);
         self.cc.stack.push(exception.value.clone());
-        self.cc.stack.push(int!(exception.exception_or_custom_code()));
+        self.cc
+            .stack
+            .push(int!(exception.exception_or_custom_code()));
         let target = self.cmd.vars[n].as_continuation_mut()?;
         match target.type_of {
             ContinuationType::CatchRevert(_depth) => {
                 // Pass the entire cc stack. CatchRevert cont will remove a range of slots
                 // under the exception pair so that the final stack depth is _depth + 2.
             }
-            _ => target.nargs = 2
+            _ => target.nargs = 2,
         }
         switch(self, var!(n))?;
         Ok(None)
@@ -1528,14 +1665,14 @@ impl Engine {
                 ExceptionCode::InvalidOpcode,
                 "remaining bits expected >= 8, but actual value is: {}",
                 self.cc.code().remaining_bits()
-            )
+            ),
         }
     }
 
     fn cmd_code_string(&self) -> String {
         match self.cmd_code() {
             Ok(code) => code.to_string(),
-            Err(err) => err.to_string()
+            Err(err) => err.to_string(),
         }
     }
     fn cmd_code(&self) -> Result<SliceData> {
@@ -1558,11 +1695,18 @@ impl Engine {
     /// get smartcontract info param from ctrl(7) tuple index 0
     pub(in crate::executor) fn smci_param(&self, index: usize) -> ResultRef<StackItem> {
         let tuple = self.ctrl(7)?.as_tuple()?;
-        let tuple = tuple.first()
+        let tuple = tuple
+            .first()
             .ok_or_else(|| exception!(ExceptionCode::RangeCheckError, "tuple has no items"))?
             .as_tuple()?;
-        tuple.get(index)
-            .ok_or_else(|| exception!(ExceptionCode::RangeCheckError, "tuple has {} items, but want {}", tuple.len(), index))
+        tuple.get(index).ok_or_else(|| {
+            exception!(
+                ExceptionCode::RangeCheckError,
+                "tuple has {} items, but want {}",
+                tuple.len(),
+                index
+            )
+        })
     }
 
     pub(in crate::executor) fn rand(&self) -> ResultRef<IntegerData> {
@@ -1573,12 +1717,26 @@ impl Engine {
         let mut tuple = self.ctrl_mut(7)?.as_tuple_mut()?;
         let t1 = match tuple.first_mut() {
             Some(t1) => t1,
-            None => return err!(ExceptionCode::RangeCheckError, "set tuple index is {} but length is {}", 0, tuple.len())
+            None => {
+                return err!(
+                    ExceptionCode::RangeCheckError,
+                    "set tuple index is {} but length is {}",
+                    0,
+                    tuple.len()
+                )
+            }
         };
         let mut t1_items = t1.as_tuple_mut()?;
         match t1_items.get_mut(6) {
             Some(v) => *v = StackItem::int(rand),
-            None => return err!(ExceptionCode::RangeCheckError, "set tuple index is {} but length is {}", 6, t1_items.len())
+            None => {
+                return err!(
+                    ExceptionCode::RangeCheckError,
+                    "set tuple index is {} but length is {}",
+                    6,
+                    t1_items.len()
+                )
+            }
         }
         self.use_gas(Gas::tuple_gas_price(t1_items.len()));
         *t1 = StackItem::tuple(t1_items);
@@ -1593,7 +1751,7 @@ impl Engine {
             let mut key = BuilderData::new();
             key.append_i32(index)?;
             if let Some(value) = params.get_with_gas(SliceData::load_builder(key)?, self)? {
-                return Ok(value.reference_opt(0))
+                return Ok(value.reference_opt(0));
             }
         }
         Ok(None)
@@ -1602,7 +1760,7 @@ impl Engine {
     pub(crate) fn read_config_param<T: Deserializable>(&mut self, index: i32) -> Result<T> {
         match self.get_config_param(index)? {
             Some(cell) => T::construct_from_cell(cell),
-            None => err!("Cannot get config param {}", index)
+            None => err!("Cannot get config param {}", index),
         }
     }
 }

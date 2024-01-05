@@ -79,29 +79,39 @@ mod test_bitsize {
         assert_eq!(IntegerData::from_i32(-7).bitsize().unwrap(), 4, "-7");
         assert_eq!(IntegerData::from_i32(-8).bitsize().unwrap(), 4, "-8");
     }
-
 }
 
 mod test_minus_2_pow_256 {
 
-    use crate::stack::integer::{IntegerData, behavior::Signaling};
-    use ton_types::{Result, types::ExceptionCode};
+    use crate::stack::integer::{behavior::Signaling, IntegerData};
+    use tvm_types::{types::ExceptionCode, Result};
 
     #[test]
     fn test_2_pow_256_overflows() {
-        assert_eq!(crate::error::tvm_exception_code(&IntegerData::from_str_radix(
-            "1_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000",
-            16).expect_err("Integer overflow is expected")),
-                Some(ExceptionCode::IntegerOverflow));
+        assert_eq!(
+            crate::error::tvm_exception_code(
+                &IntegerData::from_str_radix(
+                    "1_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000",
+                    16
+                )
+                .expect_err("Integer overflow is expected")
+            ),
+            Some(ExceptionCode::IntegerOverflow)
+        );
     }
 
     #[test]
     fn test_minus_2_pow_256_negate_overflows() {
         let value = create_minus_2_pow_256();
         assert!(value.is_neg());
-        assert_eq!(crate::error::tvm_exception_code(&value.neg::<Signaling>()
-            .expect_err("Integer overflow is expected")),
-                Some(ExceptionCode::IntegerOverflow));
+        assert_eq!(
+            crate::error::tvm_exception_code(
+                &value
+                    .neg::<Signaling>()
+                    .expect_err("Integer overflow is expected")
+            ),
+            Some(ExceptionCode::IntegerOverflow)
+        );
     }
 
     #[test]
@@ -116,22 +126,31 @@ mod test_minus_2_pow_256 {
     fn test_minus_2_pow_256_minus_one_overflows() {
         let value = create_minus_2_pow_256();
         assert!(value.is_neg());
-        assert_eq!(crate::error::tvm_exception_code(&value.sub::<Signaling>(&IntegerData::one())
-            .expect_err("Integer overflow is expected")),
-                Some(ExceptionCode::IntegerOverflow));
+        assert_eq!(
+            crate::error::tvm_exception_code(
+                &value
+                    .sub::<Signaling>(&IntegerData::one())
+                    .expect_err("Integer overflow is expected")
+            ),
+            Some(ExceptionCode::IntegerOverflow)
+        );
     }
 
     fn create_minus_2_pow_256() -> IntegerData {
         IntegerData::from_str_radix(
             "-1_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000",
-            16).unwrap()
+            16,
+        )
+        .unwrap()
     }
-
 }
 
 mod test_behavior {
 
-    use crate::stack::integer::{IntegerData, behavior::{Signaling, Quiet}};
+    use crate::stack::integer::{
+        behavior::{Quiet, Signaling},
+        IntegerData,
+    };
 
     #[test]
     fn add_quiet_vs_signaling() {
@@ -140,9 +159,9 @@ mod test_behavior {
         x.add::<Signaling>(&y)
             .expect_err("Adding a NaN with a number should fail.");
         assert!(
-            x.add::<Quiet>(&y).expect(
-                "Adding a NaN with a number doesn't fail in quiet version."
-            ).is_nan(),
+            x.add::<Quiet>(&y)
+                .expect("Adding a NaN with a number doesn't fail in quiet version.")
+                .is_nan(),
             "Result value should be a NaN"
         );
     }
@@ -150,24 +169,33 @@ mod test_behavior {
 
 mod test_bitlogics {
 
-    use crate::stack::integer::{IntegerData, behavior::Signaling};
+    use crate::stack::integer::{behavior::Signaling, IntegerData};
 
     fn test_and(x: i64, y: i64) {
         let xdst = IntegerData::from_i64(x);
         let ydst = IntegerData::from_i64(y);
-        assert_eq!(IntegerData::from_i64(x & y), xdst.and::<Signaling>(&ydst).unwrap());
+        assert_eq!(
+            IntegerData::from_i64(x & y),
+            xdst.and::<Signaling>(&ydst).unwrap()
+        );
     }
 
     fn test_or(x: i64, y: i64) {
         let xdst = IntegerData::from_i64(x);
         let ydst = IntegerData::from_i64(y);
-        assert_eq!(IntegerData::from_i64(x | y), xdst.or::<Signaling>(&ydst).unwrap());
+        assert_eq!(
+            IntegerData::from_i64(x | y),
+            xdst.or::<Signaling>(&ydst).unwrap()
+        );
     }
 
     fn test_xor(x: i64, y: i64) {
         let xdst = IntegerData::from_i64(x);
         let ydst = IntegerData::from_i64(y);
-        assert_eq!(IntegerData::from_i64(x ^ y), xdst.xor::<Signaling>(&ydst).unwrap());
+        assert_eq!(
+            IntegerData::from_i64(x ^ y),
+            xdst.xor::<Signaling>(&ydst).unwrap()
+        );
     }
 
     fn test_not(x: i64) {
@@ -177,12 +205,18 @@ mod test_bitlogics {
 
     fn test_shl(x: i64, shift: usize) {
         let xdst = IntegerData::from_i64(x);
-        assert_eq!(IntegerData::from_i64(x << shift as i64), xdst.shl::<Signaling>(shift).unwrap());
+        assert_eq!(
+            IntegerData::from_i64(x << shift as i64),
+            xdst.shl::<Signaling>(shift).unwrap()
+        );
     }
 
     fn test_shr(x: i64, shift: usize) {
         let xdst = IntegerData::from_i64(x);
-        assert_eq!(IntegerData::from_i64(x >> shift as i64), xdst.shr::<Signaling>(shift).unwrap());
+        assert_eq!(
+            IntegerData::from_i64(x >> shift as i64),
+            xdst.shr::<Signaling>(shift).unwrap()
+        );
     }
 
     #[test]
@@ -202,7 +236,7 @@ mod test_bitlogics {
 
     #[test]
     fn test_negative_and_negative() {
-        test_and(-0xF0FF,-0xF0F0);
+        test_and(-0xF0FF, -0xF0F0);
     }
 
     #[test]
@@ -222,7 +256,7 @@ mod test_bitlogics {
 
     #[test]
     fn test_negative_or_negative() {
-        test_or(-0xF0FF,-0xF0F0);
+        test_or(-0xF0FF, -0xF0F0);
     }
 
     #[test]
@@ -242,7 +276,7 @@ mod test_bitlogics {
 
     #[test]
     fn test_negative_xor_negative() {
-        test_xor(-0xF0FF,-0xF0F0);
+        test_xor(-0xF0FF, -0xF0F0);
     }
 
     #[test]
@@ -286,5 +320,4 @@ mod test_bitlogics {
         test_shr(-1, 0);
         test_shr(-12, 5);
     }
-
 }

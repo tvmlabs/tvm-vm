@@ -12,10 +12,14 @@
 */
 
 use crate::{
-    executor::{engine::Engine, microcode::{VAR, CELL, SLICE, BUILDER, CONTINUATION}},
-    stack::{StackItem, continuation::ContinuationData}, types::Status
+    executor::{
+        engine::Engine,
+        microcode::{BUILDER, CELL, CONTINUATION, SLICE, VAR},
+    },
+    stack::{continuation::ContinuationData, StackItem},
+    types::Status,
 };
-use ton_types::{fail, GasConsumer};
+use tvm_types::{fail, GasConsumer};
 
 // Utilities ******************************************************************
 
@@ -24,44 +28,49 @@ fn convert_any(engine: &mut Engine, x: u16, to: u16, from: u16) -> Status {
         fail!("convert_any no var {} in cmd", storage_index!(x));
     }
     let data = match address_tag!(x) {
-        VAR => {
-            match from {
-                BUILDER => {
-                    let var = engine.cmd.var_mut(storage_index!(x));
-                    let builder = var.as_builder_mut()?;
-                    let cell = engine.finalize_cell(builder)?;
-                    match to {
-                        CONTINUATION => StackItem::continuation(ContinuationData::with_code(engine.load_cell(cell)?)),
-                        CELL => StackItem::Cell(cell),
-                        SLICE => StackItem::Slice(engine.load_cell(cell)?),
-                        _ => fail!("can convert builder only to cell, to slice or to continuation")
-                    }
+        VAR => match from {
+            BUILDER => {
+                let var = engine.cmd.var_mut(storage_index!(x));
+                let builder = var.as_builder_mut()?;
+                let cell = engine.finalize_cell(builder)?;
+                match to {
+                    CONTINUATION => StackItem::continuation(ContinuationData::with_code(
+                        engine.load_cell(cell)?,
+                    )),
+                    CELL => StackItem::Cell(cell),
+                    SLICE => StackItem::Slice(engine.load_cell(cell)?),
+                    _ => fail!("can convert builder only to cell, to slice or to continuation"),
                 }
-                CELL => {
-                    let var = engine.cmd.var(storage_index!(x));
-                    let cell = var.as_cell()?.clone();
-                    let slice = engine.load_cell(cell)?;
-                    match to {
-                        CONTINUATION => StackItem::continuation(ContinuationData::with_code(slice)),
-                        SLICE => StackItem::Slice(slice),
-                        _ => fail!("can convert cell only to slice or to continuation")
-                    }
-                }
-                SLICE => {
-                    let var = engine.cmd.var(storage_index!(x));
-                    let slice = var.as_slice()?.clone();
-                    match to {
-                        CONTINUATION => StackItem::continuation(ContinuationData::with_code(slice)),
-                        _ => fail!("can convert slice only to continuation")
-                    }
-                }
-                _ => fail!("cannot convert")
             }
-        }
-        _ => StackItem::None
+            CELL => {
+                let var = engine.cmd.var(storage_index!(x));
+                let cell = var.as_cell()?.clone();
+                let slice = engine.load_cell(cell)?;
+                match to {
+                    CONTINUATION => StackItem::continuation(ContinuationData::with_code(slice)),
+                    SLICE => StackItem::Slice(slice),
+                    _ => fail!("can convert cell only to slice or to continuation"),
+                }
+            }
+            SLICE => {
+                let var = engine.cmd.var(storage_index!(x));
+                let slice = var.as_slice()?.clone();
+                match to {
+                    CONTINUATION => StackItem::continuation(ContinuationData::with_code(slice)),
+                    _ => fail!("can convert slice only to continuation"),
+                }
+            }
+            _ => fail!("cannot convert"),
+        },
+        _ => StackItem::None,
     };
     if data.is_null() {
-        fail!("cannot convert_any x: {:X}, to: {:X}, from: {:X}", x, to, from)
+        fail!(
+            "cannot convert_any x: {:X}, to: {:X}, from: {:X}",
+            x,
+            to,
+            from
+        )
     } else {
         *engine.cmd.var_mut(storage_index!(x)) = data;
     }

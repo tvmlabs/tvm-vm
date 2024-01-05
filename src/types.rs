@@ -11,24 +11,25 @@
 * limitations under the License.
 */
 
-use crate::stack::{StackItem, integer::IntegerData};
+use crate::stack::{integer::IntegerData, StackItem};
 use std::fmt;
-use ton_types::{Result, types::ExceptionCode};
+use tvm_types::{types::ExceptionCode, Result};
 
 #[derive(Clone, PartialEq)]
 enum ExceptionType {
     System(ExceptionCode),
-    Custom(i32)
+    Custom(i32),
 }
 
 impl ExceptionType {
     fn is_normal_termination(&self) -> Option<i32> {
         match self {
-            ExceptionType::System(ExceptionCode::NormalTermination) | 
-            ExceptionType::Custom(0) => Some(0),
-            ExceptionType::System(ExceptionCode::AlternativeTermination) | 
-            ExceptionType::Custom(1) => Some(1),
-            _ => None
+            ExceptionType::System(ExceptionCode::NormalTermination) | ExceptionType::Custom(0) => {
+                Some(0)
+            }
+            ExceptionType::System(ExceptionCode::AlternativeTermination)
+            | ExceptionType::Custom(1) => Some(1),
+            _ => None,
         }
     }
     fn exception_code(&self) -> Option<ExceptionCode> {
@@ -48,13 +49,13 @@ impl ExceptionType {
     pub fn exception_or_custom_code(&self) -> i32 {
         match self {
             ExceptionType::System(code) => *code as i32,
-            ExceptionType::Custom(code) => *code
+            ExceptionType::Custom(code) => *code,
         }
     }
     fn exception_message(&self) -> String {
         match self {
             ExceptionType::System(code) => format!("{}, code {}", code, *code as u8),
-            ExceptionType::Custom(code) => format!("code {}", code)
+            ExceptionType::Custom(code) => format!("code {}", code),
         }
     }
 }
@@ -89,10 +90,10 @@ impl Exception {
         Self::from_code_and_value(code, 0, file, line)
     }
     pub fn from_code_and_value(
-        code: ExceptionCode, 
-        value: impl Into<IntegerData>, 
-        file: &'static str, 
-        line: u32
+        code: ExceptionCode,
+        value: impl Into<IntegerData>,
+        file: &'static str,
+        line: u32,
     ) -> Exception {
         // panic!("{} {} {}:{}", code, IntegerData::from(value), file, line)
         Exception {
@@ -103,10 +104,10 @@ impl Exception {
         }
     }
     pub fn from_number_and_value(
-        number: usize, 
-        value: StackItem, 
-        file: &'static str, 
-        line: u32
+        number: usize,
+        value: StackItem,
+        file: &'static str,
+        line: u32,
     ) -> Exception {
         Exception {
             exception: ExceptionType::Custom(number as i32),
@@ -133,7 +134,7 @@ macro_rules! exception {
     ($code:expr) => {
         error!(
             TvmError::TvmExceptionFull(
-                Exception::from_code($code, file!(), line!()), 
+                Exception::from_code($code, file!(), line!()),
                 String::new()
             )
         )
@@ -141,7 +142,7 @@ macro_rules! exception {
     ($code:expr, $msg:literal, $($arg:tt)*) => {
         error!(
             TvmError::TvmExceptionFull(
-                Exception::from_code($code, file!(), line!()), 
+                Exception::from_code($code, file!(), line!()),
                 format!($msg, $($arg)*)
             )
         )
@@ -149,7 +150,7 @@ macro_rules! exception {
     ($code:expr, $value:expr, $msg:literal, $($arg:tt)*) => {
         error!(
             TvmError::TvmExceptionFull(
-                Exception::from_code_and_value($code, $value, file!(), line!()), 
+                Exception::from_code_and_value($code, $value, file!(), line!()),
                 format!($msg, $($arg)*)
             )
         )
@@ -157,7 +158,7 @@ macro_rules! exception {
     ($code:expr, $value:expr, $msg:literal) => {
         error!(
             TvmError::TvmExceptionFull(
-                Exception::from_code_and_value($code, $value, file!(), line!()), 
+                Exception::from_code_and_value($code, $value, file!(), line!()),
                 $msg.to_string()
             )
         )
@@ -165,7 +166,7 @@ macro_rules! exception {
     ($code:expr, $msg:literal) => {
         error!(
             TvmError::TvmExceptionFull(
-                Exception::from_code($code, file!(), line!()), 
+                Exception::from_code($code, file!(), line!()),
                 $msg.to_string()
             )
         )
@@ -173,7 +174,7 @@ macro_rules! exception {
     ($code:expr, $file:expr, $line:expr) => {
         error!(
             TvmError::TvmExceptionFull(
-               Exception::from_code($code, $file, $line), 
+               Exception::from_code($code, $file, $line),
                String::new()
             )
         )
@@ -214,8 +215,12 @@ macro_rules! custom_err {
 impl fmt::Display for Exception {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            f, "{}, value: {} {}:{}", 
-            self.exception.exception_message(), self.value, self.file, self.line
+            f,
+            "{}, value: {} {}:{}",
+            self.exception.exception_message(),
+            self.value,
+            self.file,
+            self.line
         )
     }
 }

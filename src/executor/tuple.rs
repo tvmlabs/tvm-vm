@@ -14,14 +14,16 @@
 use crate::{
     error::TvmError,
     executor::{
-        Mask, engine::{Engine, storage::fetch_stack}, gas::gas_state::Gas,
-        types::{InstructionOptions, Instruction, WhereToGetParams}
+        engine::{storage::fetch_stack, Engine},
+        gas::gas_state::Gas,
+        types::{Instruction, InstructionOptions, WhereToGetParams},
+        Mask,
     },
-    stack::{StackItem, integer::IntegerData},
-    types::{Exception, Status}
+    stack::{integer::IntegerData, StackItem},
+    types::{Exception, Status},
 };
-use ton_block::GlobalCapabilities;
-use ton_types::{error, fail, ExceptionCode};
+use tvm_block::GlobalCapabilities;
+use tvm_types::{error, fail, ExceptionCode};
 
 fn tuple(engine: &mut Engine, name: &'static str, how: u8) -> Status {
     let mut inst = Instruction::new(name);
@@ -56,13 +58,17 @@ pub(super) fn execute_tuple_createvar(engine: &mut Engine) -> Status {
 
 fn tuple_index(engine: &mut Engine, how: u8) -> Status {
     let index = how.mask(INDEX);
-    let params = if index == 0 {2} else {1};
+    let params = if index == 0 { 2 } else { 1 };
     engine.load_instruction(match index & 3 {
         0 => Instruction::new("INDEXVAR"),
-        1 => Instruction::new("INDEX" ).set_opts(InstructionOptions::Length(0..16)),
-        2 => Instruction::new("INDEX2").set_opts(InstructionOptions::StackRegisterPair(WhereToGetParams::GetFromLastByte2Bits)),
-        3 => Instruction::new("INDEX3").set_opts(InstructionOptions::StackRegisterTrio(WhereToGetParams::GetFromLastByte2Bits)),
-        _ => fail!("unreachabe tuple_index")
+        1 => Instruction::new("INDEX").set_opts(InstructionOptions::Length(0..16)),
+        2 => Instruction::new("INDEX2").set_opts(InstructionOptions::StackRegisterPair(
+            WhereToGetParams::GetFromLastByte2Bits,
+        )),
+        3 => Instruction::new("INDEX3").set_opts(InstructionOptions::StackRegisterTrio(
+            WhereToGetParams::GetFromLastByte2Bits,
+        )),
+        _ => fail!("unreachabe tuple_index"),
     })?;
     fetch_stack(engine, params)?;
     let n = if index == 0 {
@@ -72,12 +78,10 @@ fn tuple_index(engine: &mut Engine, how: u8) -> Status {
     };
     if engine.cmd.var(params - 1).is_null() && how.bit(QUIET) {
         engine.cc.stack.push(StackItem::None);
-        return Ok(())
+        return Ok(());
     }
     let value = match index & 3 {
-        0 => {
-            engine.cmd.var(1).tuple_item(n,how.bit(QUIET))?
-        }
+        0 => engine.cmd.var(1).tuple_item(n, how.bit(QUIET))?,
         1 => {
             let n = engine.cmd.length();
             engine.cmd.var_mut(0).tuple_item(n, how.bit(QUIET))?
@@ -96,7 +100,7 @@ fn tuple_index(engine: &mut Engine, how: u8) -> Status {
             let n = engine.cmd.sregs3().rc;
             value.tuple_item(n, false)?
         }
-        _ => fail!("unreachabe tuple_index")
+        _ => fail!("unreachabe tuple_index"),
     };
     engine.cc.stack.push(value);
     Ok(())
@@ -134,14 +138,14 @@ pub(super) fn execute_tuple_indexvar_quiet(engine: &mut Engine) -> Status {
 
 const INDEX: u8 = 0x03; // mask for INDEX index
 const COUNT: u8 = 0x01;
-const CMD:   u8 = 0x04;
+const CMD: u8 = 0x04;
 const QUIET: u8 = 0x10;
 const STACK: u8 = 0x08;
 
-const CMP:   u8 = 0xC0; // mask for comparsion
+const CMP: u8 = 0xC0; // mask for comparsion
 const EXACT: u8 = 0x40;
-const LESS:  u8 = 0x80;
-const MORE:  u8 = 0xC0;
+const LESS: u8 = 0x80;
+const MORE: u8 = 0xC0;
 
 fn untuple(engine: &mut Engine, name: &'static str, how: u8) -> Status {
     let mut params = 1;
@@ -167,15 +171,18 @@ fn untuple(engine: &mut Engine, name: &'static str, how: u8) -> Status {
     let mask = how.mask(CMP);
     if ((mask == EXACT) && (len != n))
         || ((mask == LESS) && (len < n))
-        || ((mask == MORE) && (len > n)) {
-        return err!(ExceptionCode::TypeCheckError)
+        || ((mask == MORE) && (len > n))
+    {
+        return err!(ExceptionCode::TypeCheckError);
     }
     if how.mask(CMP) == MORE {
         n = len;
     }
     engine.use_gas(Gas::tuple_gas_price(n));
     let mut vars = engine.cmd.var_mut(params - 1).withdraw_tuple_part(n)?;
-    vars.drain(..).for_each(|v| {engine.cc.stack.push(v);});
+    vars.drain(..).for_each(|v| {
+        engine.cc.stack.push(v);
+    });
     if how.bit(COUNT) {
         engine.cc.stack.push(int!(len));
     }
@@ -265,7 +272,12 @@ fn set_index_v2(engine: &mut Engine, name: &'static str, how: u8) -> Status {
             engine.use_gas(Gas::tuple_gas_price(n + 1));
         }
     } else {
-        return err!(ExceptionCode::RangeCheckError, "set_index failed {} >= {}", n, len)
+        return err!(
+            ExceptionCode::RangeCheckError,
+            "set_index failed {} >= {}",
+            n,
+            len
+        );
     }
     engine.cc.stack.push_tuple(tuple);
     Ok(())
@@ -304,7 +316,12 @@ fn set_index_v1(engine: &mut Engine, name: &'static str, how: u8) -> Status {
         tuple.append(&mut vec![StackItem::None; n - len]);
         tuple.push(var);
     } else {
-        return err!(ExceptionCode::RangeCheckError, "set_index failed {} >= {}", n, len)
+        return err!(
+            ExceptionCode::RangeCheckError,
+            "set_index failed {} >= {}",
+            n,
+            len
+        );
     }
     if !value_is_null {
         engine.use_gas(Gas::tuple_gas_price(tuple.len()));
@@ -339,7 +356,7 @@ fn tuple_length(engine: &mut Engine, name: &'static str, how: u8) -> Status {
     let _ = match engine.cmd.var(0).as_tuple() {
         Ok(tuple) => engine.cc.stack.push(int!(tuple.len())),
         Err(_) if how.bit(QUIET) => engine.cc.stack.push(int!(-1)),
-        Err(err) => return Err(err)
+        Err(err) => return Err(err),
     };
     Ok(())
 }
@@ -363,7 +380,7 @@ pub(super) fn execute_tuple_last(engine: &mut Engine) -> Status {
             engine.cc.stack.push(var.clone());
             Ok(())
         }
-        None => err!(ExceptionCode::TypeCheckError, "tuple is empty")
+        None => err!(ExceptionCode::TypeCheckError, "tuple is empty"),
     }
 }
 

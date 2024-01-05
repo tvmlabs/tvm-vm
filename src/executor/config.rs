@@ -12,15 +12,23 @@
 */
 
 use crate::{
-    executor::{engine::{Engine, storage::fetch_stack}, types::{InstructionOptions, Instruction}},
-    stack::{StackItem, integer::IntegerData}, types::Status
+    executor::{
+        engine::{storage::fetch_stack, Engine},
+        types::{Instruction, InstructionOptions},
+    },
+    stack::{integer::IntegerData, StackItem},
+    types::Status,
 };
-use ton_block::GlobalCapabilities;
+use tvm_block::GlobalCapabilities;
 
 fn execute_config_param(engine: &mut Engine, name: &'static str, opt: bool) -> Status {
     engine.load_instruction(Instruction::new(name))?;
     fetch_stack(engine, 1)?;
-    let index: i32 = engine.cmd.var(0).as_integer()?.into(std::i32::MIN..=std::i32::MAX)?;
+    let index: i32 = engine
+        .cmd
+        .var(0)
+        .as_integer()?
+        .into(std::i32::MIN..=std::i32::MAX)?;
     if let Some(value) = engine.get_config_param(index)? {
         engine.cc.stack.push(StackItem::Cell(value));
         if !opt {
@@ -29,7 +37,7 @@ fn execute_config_param(engine: &mut Engine, name: &'static str, opt: bool) -> S
     } else {
         let value = match opt {
             true => StackItem::None,
-            false => boolean!(false)
+            false => boolean!(false),
         };
         engine.cc.stack.push(value);
     }
@@ -61,9 +69,7 @@ pub(super) fn execute_config_ref_param(engine: &mut Engine) -> Status {
 }
 
 fn extract_config(engine: &mut Engine, name: &'static str) -> Status {
-    engine.load_instruction(
-        Instruction::new(name).set_opts(InstructionOptions::Length(0..16))
-    )?;
+    engine.load_instruction(Instruction::new(name).set_opts(InstructionOptions::Length(0..16)))?;
     let value = engine.smci_param(engine.cmd.length())?.clone();
     engine.cc.stack.push(value);
     Ok(())
@@ -86,7 +92,7 @@ pub(super) fn execute_now(engine: &mut Engine) -> Status {
 
 // - integer
 pub(super) fn execute_blocklt(engine: &mut Engine) -> Status {
-     extract_config(engine, "BLOCKLT")
+    extract_config(engine, "BLOCKLT")
 }
 
 // - integer

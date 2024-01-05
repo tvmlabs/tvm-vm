@@ -12,14 +12,14 @@
  */
 
 use criterion::{criterion_group, criterion_main, Criterion, SamplingMode};
-use pprof::criterion::{PProfProfiler, Output};
-use ton_block::{StateInit, Deserializable};
-use ton_types::SliceData;
-use ton_vm::{
-    executor::Engine,
-    stack::{savelist::SaveList, Stack, StackItem, continuation::ContinuationData}
-};
+use pprof::criterion::{Output, PProfProfiler};
 use std::time::Duration;
+use tvm_block::{Deserializable, StateInit};
+use tvm_types::SliceData;
+use tvm_vm::{
+    executor::Engine,
+    stack::{continuation::ContinuationData, savelist::SaveList, Stack, StackItem},
+};
 
 static DEFAULT_CAPABILITIES: u64 = 0x572e;
 
@@ -30,9 +30,9 @@ fn read_boc(filename: &str) -> Vec<u8> {
     bytes
 }
 
-fn load_boc(filename: &str) -> ton_types::Cell {
+fn load_boc(filename: &str) -> tvm_types::Cell {
     let bytes = read_boc(filename);
-    ton_types::read_single_root_boc(bytes).unwrap()
+    tvm_types::read_single_root_boc(bytes).unwrap()
 }
 
 fn load_stateinit(filename: &str) -> StateInit {
@@ -49,7 +49,7 @@ fn bench_elector_algo_1000_vtors(c: &mut Criterion) {
 
     let mut ctrls = SaveList::default();
     ctrls.put(4, &mut StackItem::Cell(elector_data)).unwrap();
-    let params = vec!(
+    let params = vec![
         StackItem::int(0x76ef1ea),
         StackItem::int(0),
         StackItem::int(0),
@@ -57,16 +57,20 @@ fn bench_elector_algo_1000_vtors(c: &mut Criterion) {
         StackItem::int(0),
         StackItem::int(0),
         StackItem::int(0),
-        StackItem::tuple(vec!(
-            StackItem::int(1000000000),
-            StackItem::None
-        )),
-        StackItem::slice(SliceData::from_string("9fe0000000000000000000000000000000000000000000000000000000000000001_").unwrap()),
+        StackItem::tuple(vec![StackItem::int(1000000000), StackItem::None]),
+        StackItem::slice(
+            SliceData::from_string(
+                "9fe0000000000000000000000000000000000000000000000000000000000000001_",
+            )
+            .unwrap(),
+        ),
         StackItem::cell(config_data.reference(0).unwrap()),
         StackItem::None,
         StackItem::int(0),
-    );
-    ctrls.put(7, &mut StackItem::tuple(vec!(StackItem::tuple(params)))).unwrap();
+    ];
+    ctrls
+        .put(7, &mut StackItem::tuple(vec![StackItem::tuple(params)]))
+        .unwrap();
 
     let mut stack = Stack::new();
     stack.push(StackItem::int(1000000000));
@@ -79,20 +83,23 @@ fn bench_elector_algo_1000_vtors(c: &mut Criterion) {
     group.noise_threshold(0.03);
     group.sample_size(10);
     group.sampling_mode(SamplingMode::Flat);
-    group.bench_function("elector-algo-1000-vtors", |b| b.iter(|| {
-        let mut engine = Engine::with_capabilities(DEFAULT_CAPABILITIES).setup_with_libraries(
-            SliceData::load_cell_ref(&elector_code).unwrap(),
-            Some(ctrls.clone()),
-            Some(stack.clone()),
-            None,
-            vec!());
-        engine.execute().unwrap();
-        assert_eq!(engine.gas_used(), 82386791);
-        let output = engine.ctrl(4).unwrap().as_cell().unwrap();
-        assert_eq!(output, &elector_data_output);
-        let actions = engine.ctrl(5).unwrap().as_cell().unwrap();
-        assert_eq!(actions, &elector_actions);
-    }));
+    group.bench_function("elector-algo-1000-vtors", |b| {
+        b.iter(|| {
+            let mut engine = Engine::with_capabilities(DEFAULT_CAPABILITIES).setup_with_libraries(
+                SliceData::load_cell_ref(&elector_code).unwrap(),
+                Some(ctrls.clone()),
+                Some(stack.clone()),
+                None,
+                vec![],
+            );
+            engine.execute().unwrap();
+            assert_eq!(engine.gas_used(), 82386791);
+            let output = engine.ctrl(4).unwrap().as_cell().unwrap();
+            assert_eq!(output, &elector_data_output);
+            let actions = engine.ctrl(5).unwrap().as_cell().unwrap();
+            assert_eq!(actions, &elector_actions);
+        })
+    });
     group.finish();
 }
 
@@ -102,7 +109,7 @@ fn bench_tiny_loop_200000_iters(c: &mut Criterion) {
 
     let mut ctrls = SaveList::default();
     ctrls.put(4, &mut StackItem::Cell(tiny_data)).unwrap();
-    let params = vec!(
+    let params = vec![
         StackItem::int(0x76ef1ea),
         StackItem::int(0),
         StackItem::int(0),
@@ -110,16 +117,15 @@ fn bench_tiny_loop_200000_iters(c: &mut Criterion) {
         StackItem::int(0),
         StackItem::int(0),
         StackItem::int(0),
-        StackItem::tuple(vec!(
-            StackItem::int(1000000000),
-            StackItem::None
-        )),
+        StackItem::tuple(vec![StackItem::int(1000000000), StackItem::None]),
         StackItem::default(),
         StackItem::None,
         StackItem::None,
         StackItem::int(0),
-    );
-    ctrls.put(7, &mut StackItem::tuple(vec!(StackItem::tuple(params)))).unwrap();
+    ];
+    ctrls
+        .put(7, &mut StackItem::tuple(vec![StackItem::tuple(params)]))
+        .unwrap();
 
     let mut stack = Stack::new();
     stack.push(StackItem::int(1000000000));
@@ -132,33 +138,38 @@ fn bench_tiny_loop_200000_iters(c: &mut Criterion) {
     group.noise_threshold(0.03);
     group.sample_size(10);
     group.sampling_mode(SamplingMode::Flat);
-    group.bench_function("tiny-loop-200000-iters", |b| b.iter(|| {
-        let mut engine = Engine::with_capabilities(DEFAULT_CAPABILITIES).setup_with_libraries(
-            SliceData::load_cell_ref(&tiny_code).unwrap(),
-            Some(ctrls.clone()),
-            Some(stack.clone()),
-            None,
-            vec!());
-        engine.execute().unwrap();
-        assert_eq!(engine.gas_used(), 34000891);
-        // result of computation gets verified within the test itself
-    }));
+    group.bench_function("tiny-loop-200000-iters", |b| {
+        b.iter(|| {
+            let mut engine = Engine::with_capabilities(DEFAULT_CAPABILITIES).setup_with_libraries(
+                SliceData::load_cell_ref(&tiny_code).unwrap(),
+                Some(ctrls.clone()),
+                Some(stack.clone()),
+                None,
+                vec![],
+            );
+            engine.execute().unwrap();
+            assert_eq!(engine.gas_used(), 34000891);
+            // result of computation gets verified within the test itself
+        })
+    });
 }
 
 fn bench_num_bigint(c: &mut Criterion) {
-    c.bench_function("num-bigint", |b| b.iter( || {
-        let n = num::BigInt::from(1000000);
-        let mut accum = num::BigInt::from(0);
-        let mut iter = num::BigInt::from(0);
-        loop {
-            if !(iter < n) {
-                break;
+    c.bench_function("num-bigint", |b| {
+        b.iter(|| {
+            let n = num::BigInt::from(1000000);
+            let mut accum = num::BigInt::from(0);
+            let mut iter = num::BigInt::from(0);
+            loop {
+                if !(iter < n) {
+                    break;
+                }
+                accum += num::BigInt::from(iter.bits());
+                iter += 1;
             }
-            accum += num::BigInt::from(iter.bits());
-            iter += 1;
-        }
-        assert_eq!(num::BigInt::from(18951425), accum);
-    }));
+            assert_eq!(num::BigInt::from(18951425), accum);
+        })
+    });
 }
 
 // Note: the gmp-mpfr-based rug crate shows almost the same perf as num-bigint
@@ -181,9 +192,9 @@ fn bench_num_bigint(c: &mut Criterion) {
 
 fn bench_load_boc(c: &mut Criterion) {
     let bytes = read_boc("benches/elector-data.boc");
-    c.bench_function("load-boc", |b| b.iter( || {
-        ton_types::read_single_root_boc(bytes.clone()).unwrap()
-    }));
+    c.bench_function("load-boc", |b| {
+        b.iter(|| tvm_types::read_single_root_boc(bytes.clone()).unwrap())
+    });
 }
 
 const MAX_TUPLE_SIZE: usize = 255;
@@ -227,9 +238,12 @@ fn bench_mergesort_tuple(c: &mut Criterion) {
 
     // runvmx mode: +1 = same_c3
     let mut ctrls = SaveList::default();
-    ctrls.put(3, &mut StackItem::continuation(
-        ContinuationData::with_code(code_slice.clone())
-    )).unwrap();
+    ctrls
+        .put(
+            3,
+            &mut StackItem::continuation(ContinuationData::with_code(code_slice.clone())),
+        )
+        .unwrap();
 
     let mut stack = Stack::new();
     stack.push(StackItem::int(-1));
@@ -237,25 +251,30 @@ fn bench_mergesort_tuple(c: &mut Criterion) {
     // runvmx mode: +2 = push_0
     stack.push(StackItem::int(0));
 
-    c.bench_function("mergesort-tuple", |b| b.iter(|| {
-        let mut engine = Engine::with_capabilities(DEFAULT_CAPABILITIES).setup_with_libraries(
-            code_slice.clone(),
-            Some(ctrls.clone()),
-            Some(stack.clone()),
-            None,
-            vec!());
-        engine.execute().unwrap();
-        assert_eq!(engine.gas_used(), 51_216_096);
-        assert_eq!(engine.stack().depth(), 1);
-        assert_eq!(engine.stack().get(0), &expected);
-    }));
+    c.bench_function("mergesort-tuple", |b| {
+        b.iter(|| {
+            let mut engine = Engine::with_capabilities(DEFAULT_CAPABILITIES).setup_with_libraries(
+                code_slice.clone(),
+                Some(ctrls.clone()),
+                Some(stack.clone()),
+                None,
+                vec![],
+            );
+            engine.execute().unwrap();
+            assert_eq!(engine.gas_used(), 51_216_096);
+            assert_eq!(engine.stack().depth(), 1);
+            assert_eq!(engine.stack().get(0), &expected);
+        })
+    });
 }
 
 fn bench_massive_cell_upload(c: &mut Criterion) {
     let stateinit = load_stateinit("benches/massive/cell-upload.tvc");
     let mut ctrls = SaveList::default();
-    ctrls.put(4, &mut StackItem::cell(stateinit.data().unwrap().clone())).unwrap();
-    let params = vec!(
+    ctrls
+        .put(4, &mut StackItem::cell(stateinit.data().unwrap().clone()))
+        .unwrap();
+    let params = vec![
         StackItem::int(0x76ef1ea),
         StackItem::int(0),
         StackItem::int(0),
@@ -263,16 +282,15 @@ fn bench_massive_cell_upload(c: &mut Criterion) {
         StackItem::int(0),
         StackItem::int(0),
         StackItem::int(0),
-        StackItem::tuple(vec!(
-            StackItem::int(1000000000),
-            StackItem::None
-        )),
+        StackItem::tuple(vec![StackItem::int(1000000000), StackItem::None]),
         StackItem::default(),
         StackItem::None,
         StackItem::None,
         StackItem::int(0),
-    );
-    ctrls.put(7, &mut StackItem::tuple(vec!(StackItem::tuple(params)))).unwrap();
+    ];
+    ctrls
+        .put(7, &mut StackItem::tuple(vec![StackItem::tuple(params)]))
+        .unwrap();
 
     let msg = load_boc("benches/massive/cell-upload-msg.boc");
     let mut body = SliceData::load_cell_ref(&msg).unwrap();
@@ -285,23 +303,28 @@ fn bench_massive_cell_upload(c: &mut Criterion) {
     stack.push(StackItem::slice(body));
     stack.push(StackItem::int(-1));
 
-    c.bench_function("massive-cell-upload", |b| b.iter(|| {
-        let mut engine = Engine::with_capabilities(DEFAULT_CAPABILITIES).setup_with_libraries(
-            SliceData::load_cell_ref(&stateinit.code().unwrap()).unwrap(),
-            Some(ctrls.clone()),
-            Some(stack.clone()),
-            None,
-            vec!());
-        engine.execute().unwrap();
-        assert_eq!(engine.gas_used(), 5479);
-    }));
+    c.bench_function("massive-cell-upload", |b| {
+        b.iter(|| {
+            let mut engine = Engine::with_capabilities(DEFAULT_CAPABILITIES).setup_with_libraries(
+                SliceData::load_cell_ref(&stateinit.code().unwrap()).unwrap(),
+                Some(ctrls.clone()),
+                Some(stack.clone()),
+                None,
+                vec![],
+            );
+            engine.execute().unwrap();
+            assert_eq!(engine.gas_used(), 5479);
+        })
+    });
 }
 
 fn bench_massive_cell_finalize(c: &mut Criterion) {
     let stateinit = load_stateinit("benches/massive/cell-finalize.tvc");
     let mut ctrls = SaveList::default();
-    ctrls.put(4, &mut StackItem::cell(stateinit.data().unwrap().clone())).unwrap();
-    let params = vec!(
+    ctrls
+        .put(4, &mut StackItem::cell(stateinit.data().unwrap().clone()))
+        .unwrap();
+    let params = vec![
         StackItem::int(0x76ef1ea),
         StackItem::int(0),
         StackItem::int(0),
@@ -309,16 +332,15 @@ fn bench_massive_cell_finalize(c: &mut Criterion) {
         StackItem::int(0),
         StackItem::int(0),
         StackItem::int(0),
-        StackItem::tuple(vec!(
-            StackItem::int(1000000000),
-            StackItem::None
-        )),
+        StackItem::tuple(vec![StackItem::int(1000000000), StackItem::None]),
         StackItem::default(),
         StackItem::None,
         StackItem::None,
         StackItem::int(0),
-    );
-    ctrls.put(7, &mut StackItem::tuple(vec!(StackItem::tuple(params)))).unwrap();
+    ];
+    ctrls
+        .put(7, &mut StackItem::tuple(vec![StackItem::tuple(params)]))
+        .unwrap();
 
     let msg = load_boc("benches/massive/cell-finalize-msg.boc");
     let mut body = SliceData::load_cell_ref(&msg).unwrap();
@@ -331,16 +353,19 @@ fn bench_massive_cell_finalize(c: &mut Criterion) {
     stack.push(StackItem::slice(body));
     stack.push(StackItem::int(-1));
 
-    c.bench_function("massive-cell-finalize", |b| b.iter(|| {
-        let mut engine = Engine::with_capabilities(DEFAULT_CAPABILITIES).setup_with_libraries(
-            SliceData::load_cell_ref(&stateinit.code().unwrap()).unwrap(),
-            Some(ctrls.clone()),
-            Some(stack.clone()),
-            None,
-            vec!());
-        engine.execute().unwrap();
-        assert_eq!(engine.gas_used(), 203585);
-    }));
+    c.bench_function("massive-cell-finalize", |b| {
+        b.iter(|| {
+            let mut engine = Engine::with_capabilities(DEFAULT_CAPABILITIES).setup_with_libraries(
+                SliceData::load_cell_ref(&stateinit.code().unwrap()).unwrap(),
+                Some(ctrls.clone()),
+                Some(stack.clone()),
+                None,
+                vec![],
+            );
+            engine.execute().unwrap();
+            assert_eq!(engine.gas_used(), 203585);
+        })
+    });
 }
 
 criterion_group!(
