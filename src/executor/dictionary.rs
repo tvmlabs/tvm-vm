@@ -1,42 +1,43 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    error::TvmError,
-    executor::{
-        continuation::{callx, switch},
-        engine::{storage::fetch_stack, Engine},
-        microcode::VAR,
-        types::{Instruction, InstructionOptions},
-        Mask,
-    },
-    stack::{
-        continuation::ContinuationData,
-        integer::{
-            serialization::{
-                Encoding, SignedIntegerBigEndianEncoding, UnsignedIntegerBigEndianEncoding,
-            },
-            IntegerData,
-        },
-        serialization::Deserializer,
-        StackItem,
-    },
-    types::{Exception, Status},
-};
-use tvm_types::{
-    error, fail, types::ExceptionCode, BuilderData, GasConsumer, HashmapE, HashmapSubtree,
-    PfxHashmapE, Result, SliceData,
-};
+use tvm_types::error;
+use tvm_types::fail;
+use tvm_types::types::ExceptionCode;
+use tvm_types::BuilderData;
+use tvm_types::GasConsumer;
+use tvm_types::HashmapE;
+use tvm_types::HashmapSubtree;
+use tvm_types::PfxHashmapE;
+use tvm_types::Result;
+use tvm_types::SliceData;
+
+use crate::error::TvmError;
+use crate::executor::continuation::callx;
+use crate::executor::continuation::switch;
+use crate::executor::engine::storage::fetch_stack;
+use crate::executor::engine::Engine;
+use crate::executor::microcode::VAR;
+use crate::executor::types::Instruction;
+use crate::executor::types::InstructionOptions;
+use crate::executor::Mask;
+use crate::stack::continuation::ContinuationData;
+use crate::stack::integer::serialization::Encoding;
+use crate::stack::integer::serialization::SignedIntegerBigEndianEncoding;
+use crate::stack::integer::serialization::UnsignedIntegerBigEndianEncoding;
+use crate::stack::integer::IntegerData;
+use crate::stack::serialization::Deserializer;
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::Status;
 
 fn try_unref_leaf(slice: SliceData) -> Result<StackItem> {
     match slice.remaining_bits() == 0 && slice.remaining_references() != 0 {
@@ -67,7 +68,8 @@ type ValAccessor = fn(&mut Engine, &mut HashmapE, SliceData) -> Result<Option<St
 
 // Legend: ret = 0 if INV or -1
 // ((value if SET) key slice nbits -
-// ((slice if SET or DEL) (value if GET) (ret if RET)) | ((slice if SET or DEL) (!ret if RET)))
+// ((slice if SET or DEL) (value if GET) (ret if RET)) | ((slice if SET or DEL)
+// (!ret if RET)))
 fn dict(
     engine: &mut Engine,
     name: &'static str,
@@ -90,10 +92,7 @@ fn dict(
     let key = keyreader(engine.cmd.var(2), nbits)?;
     if key.is_empty() {
         if how.any(SET | DEL) {
-            err!(
-                ExceptionCode::RangeCheckError,
-                "key cannot be empty for set or delete"
-            )
+            err!(ExceptionCode::RangeCheckError, "key cannot be empty for set or delete")
         } else {
             if how.bit(RET) {
                 engine.cc.stack.push(boolean!(false));
@@ -132,10 +131,7 @@ fn dictcont(engine: &mut Engine, name: &'static str, keyreader: KeyReader, how: 
     let dict = HashmapE::with_hashmap(nbits, engine.cmd.var(1).as_dict()?.cloned());
     let key = keyreader(engine.cmd.var(2), nbits)?;
     if let Some(data) = dict.get_with_gas(key, engine)? {
-        engine
-            .cmd
-            .vars
-            .push(StackItem::continuation(ContinuationData::with_code(data)));
+        engine.cmd.vars.push(StackItem::continuation(ContinuationData::with_code(data)));
         let n = engine.cmd.var_count() - 1;
         if how.bit(SWITCH) {
             switch(engine, var!(n))
@@ -260,15 +256,9 @@ fn pfxdictget(engine: &mut Engine, name: &'static str, how: u8) -> Status {
         key = engine.cmd.var(2).as_slice()?.clone();
     }
     if let (prefix, Some(value), suffix) = dict.get_prefix_leaf_with_gas(key.clone(), engine)? {
-        engine
-            .cc
-            .stack
-            .push(StackItem::Slice(key.shrink_data(prefix.remaining_bits()..)));
+        engine.cc.stack.push(StackItem::Slice(key.shrink_data(prefix.remaining_bits()..)));
         if get_cont {
-            engine
-                .cmd
-                .vars
-                .push(StackItem::continuation(ContinuationData::with_code(value)));
+            engine.cmd.vars.push(StackItem::continuation(ContinuationData::with_code(value)));
         } else {
             engine.cc.stack.push(StackItem::Slice(value));
         }
@@ -360,9 +350,7 @@ fn valreader_from_ref(
     dict: &mut HashmapE,
     key: SliceData,
 ) -> Result<Option<StackItem>> {
-    dict.get_with_gas(key, engine)?
-        .map(try_unref_leaf)
-        .transpose()
+    dict.get_with_gas(key, engine)?.map(try_unref_leaf).transpose()
 }
 
 fn valreader_from_refopt(
@@ -370,10 +358,7 @@ fn valreader_from_refopt(
     dict: &mut HashmapE,
     key: SliceData,
 ) -> Result<Option<StackItem>> {
-    dict.get_with_gas(key, engine)?
-        .map(try_unref_leaf)
-        .or(Some(Ok(StackItem::None)))
-        .transpose()
+    dict.get_with_gas(key, engine)?.map(try_unref_leaf).or(Some(Ok(StackItem::None))).transpose()
 }
 
 fn valwriter_add_slice(
@@ -436,10 +421,7 @@ fn valwriter_add_or_remove_refopt(
         Some(new_val) => dict.setref_with_gas(key, &new_val.clone(), engine)?,
         None => dict.remove_with_gas(key, engine)?,
     };
-    old_value
-        .map(try_unref_leaf)
-        .or(Some(Ok(StackItem::None)))
-        .transpose()
+    old_value.map(try_unref_leaf).or(Some(Ok(StackItem::None))).transpose()
 }
 
 fn valwriter_remove_slice(
@@ -455,9 +437,7 @@ fn valwriter_remove_ref(
     dict: &mut HashmapE,
     key: SliceData,
 ) -> Result<Option<StackItem>> {
-    dict.remove_with_gas(key, engine)?
-        .map(try_unref_leaf)
-        .transpose()
+    dict.remove_with_gas(key, engine)?.map(try_unref_leaf).transpose()
 }
 
 fn valwriter_replace_slice(
@@ -502,9 +482,7 @@ fn valwriter_to_slice(
     key: SliceData,
 ) -> Result<Option<StackItem>> {
     let val = engine.cmd.var_mut(3).withdraw();
-    Ok(dict
-        .set_with_gas(key, val.as_slice()?, engine)?
-        .map(StackItem::Slice))
+    Ok(dict.set_with_gas(key, val.as_slice()?, engine)?.map(StackItem::Slice))
 }
 
 fn valwriter_to_builder(
@@ -513,9 +491,7 @@ fn valwriter_to_builder(
     key: SliceData,
 ) -> Result<Option<StackItem>> {
     let val = engine.cmd.var_mut(3).withdraw();
-    Ok(dict
-        .set_builder_with_gas(key, val.as_builder()?, engine)?
-        .map(StackItem::Slice))
+    Ok(dict.set_builder_with_gas(key, val.as_builder()?, engine)?.map(StackItem::Slice))
 }
 
 fn valwriter_to_ref(
@@ -524,9 +500,7 @@ fn valwriter_to_ref(
     key: SliceData,
 ) -> Result<Option<StackItem>> {
     let val = engine.cmd.var(3).as_cell()?.clone();
-    dict.setref_with_gas(key, &val, engine)?
-        .map(try_unref_leaf)
-        .transpose()
+    dict.setref_with_gas(key, &val, engine)?.map(try_unref_leaf).transpose()
 }
 
 const PREV: u8 = 0x00;
@@ -592,57 +566,27 @@ fn write_key(engine: &mut Engine, key: BuilderData, how: u8) -> Result<StackItem
 
 // (value key slice nbits - (slice -1) | (slice 0))
 pub(super) fn execute_dictadd(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTADD",
-        keyreader_from_slice,
-        INV | RET | SET,
-        valwriter_add_slice,
-    )
+    dict(engine, "DICTADD", keyreader_from_slice, INV | RET | SET, valwriter_add_slice)
 }
 
 // (builder key slice nbits - (slice -1) | (slice 0))
 pub(super) fn execute_dictaddb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTADDB",
-        keyreader_from_slice,
-        CNV | INV | RET | SET,
-        valwriter_add_builder,
-    )
+    dict(engine, "DICTADDB", keyreader_from_slice, CNV | INV | RET | SET, valwriter_add_builder)
 }
 
 // (value key slice nbits - (slice -1) | (slice y 0))
 pub(super) fn execute_dictaddget(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTADDGET",
-        keyreader_from_slice,
-        INV | SETGET,
-        valwriter_add_slice,
-    )
+    dict(engine, "DICTADDGET", keyreader_from_slice, INV | SETGET, valwriter_add_slice)
 }
 
 // (builder key slice nbits - (slice -1) | (slice value 0))
 pub(super) fn execute_dictaddgetb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTADDGETB",
-        keyreader_from_slice,
-        CNV | INV | SETGET,
-        valwriter_add_builder,
-    )
+    dict(engine, "DICTADDGETB", keyreader_from_slice, CNV | INV | SETGET, valwriter_add_builder)
 }
 
 // (cell key slice nbits - (slice' -1) | (slice cell 0))
 pub(super) fn execute_dictaddgetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTADDGETREF",
-        keyreader_from_slice,
-        INV | SETGET,
-        valwriter_add_ref,
-    )
+    dict(engine, "DICTADDGETREF", keyreader_from_slice, INV | SETGET, valwriter_add_ref)
 }
 
 // (cell key slice nbits - (slice -1) | (slice 0))
@@ -658,46 +602,22 @@ pub(super) fn execute_dictaddref(engine: &mut Engine) -> Status {
 
 // (key slice nbits - (slice -1) | (slice 0))
 pub(super) fn execute_dictdel(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTDEL",
-        keyreader_from_slice,
-        DEL | RET,
-        valwriter_remove_slice,
-    )
+    dict(engine, "DICTDEL", keyreader_from_slice, DEL | RET, valwriter_remove_slice)
 }
 
 // (key slice nbits - (slice value -1) | (slice 0))
 pub(super) fn execute_dictdelget(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTDELGET",
-        keyreader_from_slice,
-        DEL | GET | RET,
-        valwriter_remove_slice,
-    )
+    dict(engine, "DICTDELGET", keyreader_from_slice, DEL | GET | RET, valwriter_remove_slice)
 }
 
 // (key slice nbits - (slice cell -1) | (slice 0))
 pub(super) fn execute_dictdelgetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTDELGETREF",
-        keyreader_from_slice,
-        DEL | GET | RET,
-        valwriter_remove_ref,
-    )
+    dict(engine, "DICTDELGETREF", keyreader_from_slice, DEL | GET | RET, valwriter_remove_ref)
 }
 
 // (key slice nbits - (value -1) | (0))
 pub(super) fn execute_dictget(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTGET",
-        keyreader_from_slice,
-        GET | RET,
-        valreader_from_slice,
-    )
+    dict(engine, "DICTGET", keyreader_from_slice, GET | RET, valreader_from_slice)
 }
 
 // (key slice nbits - (value key -1) | (0))
@@ -722,68 +642,32 @@ pub(super) fn execute_dictgetpreveq(engine: &mut Engine) -> Status {
 
 // (key slice nbits - (cell -1) | (0))
 pub(super) fn execute_dictgetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTGETREF",
-        keyreader_from_slice,
-        GET | RET,
-        valreader_from_ref,
-    )
+    dict(engine, "DICTGETREF", keyreader_from_slice, GET | RET, valreader_from_ref)
 }
 
 // (value int slice nbits - (slice -1) | (slice 0))
 pub(super) fn execute_dictiadd(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIADD",
-        keyreader_from_int,
-        INV | RET | SET,
-        valwriter_add_slice,
-    )
+    dict(engine, "DICTIADD", keyreader_from_int, INV | RET | SET, valwriter_add_slice)
 }
 
 // (builder int slice nbits - (slice -1) | (slice 0))
 pub(super) fn execute_dictiaddb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIADDB",
-        keyreader_from_int,
-        CNV | INV | RET | SET,
-        valwriter_add_builder,
-    )
+    dict(engine, "DICTIADDB", keyreader_from_int, CNV | INV | RET | SET, valwriter_add_builder)
 }
 
 // (value int slice nbits - (slice -1) | (slice value 0))
 pub(super) fn execute_dictiaddget(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIADDGET",
-        keyreader_from_int,
-        INV | SETGET,
-        valwriter_add_slice,
-    )
+    dict(engine, "DICTIADDGET", keyreader_from_int, INV | SETGET, valwriter_add_slice)
 }
 
 // (builder int slice nbits - (slice' -1) | (slice y 0))
 pub(super) fn execute_dictiaddgetb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIADDGETB",
-        keyreader_from_int,
-        CNV | INV | SETGET,
-        valwriter_add_builder,
-    )
+    dict(engine, "DICTIADDGETB", keyreader_from_int, CNV | INV | SETGET, valwriter_add_builder)
 }
 
 // (cell int slice nbits - (slice -1) | (slice cell 0))
 pub(super) fn execute_dictiaddgetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIADDGETREF",
-        keyreader_from_int,
-        INV | SETGET,
-        valwriter_add_ref,
-    )
+    dict(engine, "DICTIADDGETREF", keyreader_from_int, INV | SETGET, valwriter_add_ref)
 }
 
 // (cell int slice nbits - (slice -1) | (slice 0))
@@ -799,46 +683,22 @@ pub(super) fn execute_dictiaddref(engine: &mut Engine) -> Status {
 
 // (int slice nbits - (slice' -1) | (slice 0))
 pub(super) fn execute_dictidel(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIDEL",
-        keyreader_from_int,
-        DEL | RET,
-        valwriter_remove_slice,
-    )
+    dict(engine, "DICTIDEL", keyreader_from_int, DEL | RET, valwriter_remove_slice)
 }
 
 // (int slice nbits - (slice value -1) | (slice 0))
 pub(super) fn execute_dictidelget(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIDELGET",
-        keyreader_from_int,
-        DEL | GET | RET,
-        valwriter_remove_slice,
-    )
+    dict(engine, "DICTIDELGET", keyreader_from_int, DEL | GET | RET, valwriter_remove_slice)
 }
 
 // (int slice nbits - (slice cell -1) | (slice 0))
 pub(super) fn execute_dictidelgetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIDELGETREF",
-        keyreader_from_int,
-        DEL | GET | RET,
-        valwriter_remove_ref,
-    )
+    dict(engine, "DICTIDELGETREF", keyreader_from_int, DEL | GET | RET, valwriter_remove_ref)
 }
 
 // (int slice nbits - (value -1) | (0))
 pub(super) fn execute_dictiget(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIGET",
-        keyreader_from_int,
-        GET | RET,
-        valreader_from_slice,
-    )
+    dict(engine, "DICTIGET", keyreader_from_int, GET | RET, valreader_from_slice)
 }
 
 // (int slice nbits - (value key -1) | (0))
@@ -863,13 +723,7 @@ pub(super) fn execute_dictigetpreveq(engine: &mut Engine) -> Status {
 
 // (int slice nbits - (cell -1) | (0))
 pub(super) fn execute_dictigetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIGETREF",
-        keyreader_from_int,
-        GET | RET,
-        valreader_from_ref,
-    )
+    dict(engine, "DICTIGETREF", keyreader_from_int, GET | RET, valreader_from_ref)
 }
 
 // (slice nbits - (value int -1) | (0))
@@ -914,134 +768,62 @@ pub(super) fn execute_dictiremminref(engine: &mut Engine) -> Status {
 
 // (value int slice nbits - (slice -1) | (slice 0))
 pub(super) fn execute_dictireplace(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIREPLACE",
-        keyreader_from_int,
-        RET | SET,
-        valwriter_replace_slice,
-    )
+    dict(engine, "DICTIREPLACE", keyreader_from_int, RET | SET, valwriter_replace_slice)
 }
 
 // (builder int slice nbits - (slice -1) | (slice 0))
 pub(super) fn execute_dictireplaceb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIREPLACEB",
-        keyreader_from_int,
-        CNV | RET | SET,
-        valwriter_replace_builder,
-    )
+    dict(engine, "DICTIREPLACEB", keyreader_from_int, CNV | RET | SET, valwriter_replace_builder)
 }
 
 // (value int slice nbits - (slice value -1) | (slice 0))
 pub(super) fn execute_dictireplaceget(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIREPLACEGET",
-        keyreader_from_int,
-        SETGET,
-        valwriter_replace_slice,
-    )
+    dict(engine, "DICTIREPLACEGET", keyreader_from_int, SETGET, valwriter_replace_slice)
 }
 
 // (builder int slice nbits - (slice value -1) | (slice 0))
 pub(super) fn execute_dictireplacegetb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIREPLACEGETB",
-        keyreader_from_int,
-        CNV | SETGET,
-        valwriter_replace_builder,
-    )
+    dict(engine, "DICTIREPLACEGETB", keyreader_from_int, CNV | SETGET, valwriter_replace_builder)
 }
 
 // (cell int slice nbits - (slice' cell -1) | (slice 0))
 pub(super) fn execute_dictireplacegetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIREPLACEGETREF",
-        keyreader_from_int,
-        SETGET,
-        valwriter_replace_ref,
-    )
+    dict(engine, "DICTIREPLACEGETREF", keyreader_from_int, SETGET, valwriter_replace_ref)
 }
 
 // (cell int slice nbits - (slice -1) | (slice 0))
 pub(super) fn execute_dictireplaceref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIREPLACEREF",
-        keyreader_from_int,
-        RET | SET,
-        valwriter_replace_ref,
-    )
+    dict(engine, "DICTIREPLACEREF", keyreader_from_int, RET | SET, valwriter_replace_ref)
 }
 
 // (value int slice nbits - slice)
 pub(super) fn execute_dictiset(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTISET",
-        keyreader_from_int,
-        SET,
-        valwriter_to_slice,
-    )
+    dict(engine, "DICTISET", keyreader_from_int, SET, valwriter_to_slice)
 }
 
 // (builder int slice nbits - slice)
 pub(super) fn execute_dictisetb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTISETB",
-        keyreader_from_int,
-        CNV | SET,
-        valwriter_to_builder,
-    )
+    dict(engine, "DICTISETB", keyreader_from_int, CNV | SET, valwriter_to_builder)
 }
 
 // (value int slice nbits - (slice y -1) | (slice 0))
 pub(super) fn execute_dictisetget(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTISETGET",
-        keyreader_from_int,
-        SETGET,
-        valwriter_to_slice,
-    )
+    dict(engine, "DICTISETGET", keyreader_from_int, SETGET, valwriter_to_slice)
 }
 
 // (builder int slice nbits - (slice' y -1) | (slice' 0))
 pub(super) fn execute_dictisetgetb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTISETGETB",
-        keyreader_from_int,
-        CNV | SETGET,
-        valwriter_to_builder,
-    )
+    dict(engine, "DICTISETGETB", keyreader_from_int, CNV | SETGET, valwriter_to_builder)
 }
 
 // (cell int slice nbits - (slice cell -1) | (slice 0))
 pub(super) fn execute_dictisetgetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTISETGETREF",
-        keyreader_from_int,
-        SETGET,
-        valwriter_to_ref,
-    )
+    dict(engine, "DICTISETGETREF", keyreader_from_int, SETGET, valwriter_to_ref)
 }
 
 // (cell int slice nbits - slice)
 pub(super) fn execute_dictisetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTISETREF",
-        keyreader_from_int,
-        SET,
-        valwriter_to_ref,
-    )
+    dict(engine, "DICTISETREF", keyreader_from_int, SET, valwriter_to_ref)
 }
 
 // (slice nbits - (value key -1) | (0))
@@ -1086,189 +868,87 @@ pub(super) fn execute_dictremminref(engine: &mut Engine) -> Status {
 
 // (value key slice nbits - (slice -1) | (slice 0))
 pub(super) fn execute_dictreplace(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTREPLACE",
-        keyreader_from_slice,
-        RET | SET,
-        valwriter_replace_slice,
-    )
+    dict(engine, "DICTREPLACE", keyreader_from_slice, RET | SET, valwriter_replace_slice)
 }
 
 // (builder key slice nbits - (slice -1) | (slice 0))
 pub(super) fn execute_dictreplaceb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTREPLACEB",
-        keyreader_from_slice,
-        CNV | RET | SET,
-        valwriter_replace_builder,
-    )
+    dict(engine, "DICTREPLACEB", keyreader_from_slice, CNV | RET | SET, valwriter_replace_builder)
 }
 
 // (value key slice nbits - (slice value -1) | (slice 0))
 pub(super) fn execute_dictreplaceget(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTREPLACEGET",
-        keyreader_from_slice,
-        SETGET,
-        valwriter_replace_slice,
-    )
+    dict(engine, "DICTREPLACEGET", keyreader_from_slice, SETGET, valwriter_replace_slice)
 }
 
 // (builder key slice nbits - (slice value -1) | (slice 0))
 pub(super) fn execute_dictreplacegetb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTREPLACEGETB",
-        keyreader_from_slice,
-        CNV | SETGET,
-        valwriter_replace_builder,
-    )
+    dict(engine, "DICTREPLACEGETB", keyreader_from_slice, CNV | SETGET, valwriter_replace_builder)
 }
 
 // (cell key slice nbits - (slice cell -1) | (slice 0))
 pub(super) fn execute_dictreplacegetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTREPLACEGETREF",
-        keyreader_from_slice,
-        SETGET,
-        valwriter_replace_ref,
-    )
+    dict(engine, "DICTREPLACEGETREF", keyreader_from_slice, SETGET, valwriter_replace_ref)
 }
 
 // (cell key slice nbits - (slice -1) | (slice 0))
 pub(super) fn execute_dictreplaceref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTREPLACEREF",
-        keyreader_from_slice,
-        RET | SET,
-        valwriter_replace_ref,
-    )
+    dict(engine, "DICTREPLACEREF", keyreader_from_slice, RET | SET, valwriter_replace_ref)
 }
 
 // (value key slice nbits - slice)
 pub(super) fn execute_dictset(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTSET",
-        keyreader_from_slice,
-        SET,
-        valwriter_to_slice,
-    )
+    dict(engine, "DICTSET", keyreader_from_slice, SET, valwriter_to_slice)
 }
 
 // (builder key slice nbits - slice)
 pub(super) fn execute_dictsetb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTSETB",
-        keyreader_from_slice,
-        CNV | SET,
-        valwriter_to_builder,
-    )
+    dict(engine, "DICTSETB", keyreader_from_slice, CNV | SET, valwriter_to_builder)
 }
 
 // (value key slice nbits - (slice y -1) | (slice 0))
 pub(super) fn execute_dictsetget(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTSETGET",
-        keyreader_from_slice,
-        SETGET,
-        valwriter_to_slice,
-    )
+    dict(engine, "DICTSETGET", keyreader_from_slice, SETGET, valwriter_to_slice)
 }
 
 // (builder key slice nbits - (slice value -1) | (slice 0))
 pub(super) fn execute_dictsetgetb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTSETGETB",
-        keyreader_from_slice,
-        CNV | SETGET,
-        valwriter_to_builder,
-    )
+    dict(engine, "DICTSETGETB", keyreader_from_slice, CNV | SETGET, valwriter_to_builder)
 }
 
 // (cell key slice nbits - (slice cell -1) | (slice 0))
 pub(super) fn execute_dictsetgetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTSETGETREF",
-        keyreader_from_slice,
-        SETGET,
-        valwriter_to_ref,
-    )
+    dict(engine, "DICTSETGETREF", keyreader_from_slice, SETGET, valwriter_to_ref)
 }
 
 // (cell key slice nbits - slice)
 pub(super) fn execute_dictsetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTSETREF",
-        keyreader_from_slice,
-        SET,
-        valwriter_to_ref,
-    )
+    dict(engine, "DICTSETREF", keyreader_from_slice, SET, valwriter_to_ref)
 }
 
 // (value uint slice nbits - (slice -1) | (slice 0))
 pub(super) fn execute_dictuadd(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUADD",
-        keyreader_from_uint,
-        INV | RET | SET,
-        valwriter_add_slice,
-    )
+    dict(engine, "DICTUADD", keyreader_from_uint, INV | RET | SET, valwriter_add_slice)
 }
 
 // (builder uint slice nbits - (slice -1) | (slice 0))
 pub(super) fn execute_dictuaddb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUADDB",
-        keyreader_from_uint,
-        CNV | INV | RET | SET,
-        valwriter_add_builder,
-    )
+    dict(engine, "DICTUADDB", keyreader_from_uint, CNV | INV | RET | SET, valwriter_add_builder)
 }
 
 // (value uint slice nbits - (slice -1) | (slice value 0))
 pub(super) fn execute_dictuaddget(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUADDGET",
-        keyreader_from_uint,
-        INV | SETGET,
-        valwriter_add_slice,
-    )
+    dict(engine, "DICTUADDGET", keyreader_from_uint, INV | SETGET, valwriter_add_slice)
 }
 
 // (builder uint slice nbits - (slice' -1) | (slice y 0))
 pub(super) fn execute_dictuaddgetb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUADDGETB",
-        keyreader_from_uint,
-        CNV | INV | SETGET,
-        valwriter_add_builder,
-    )
+    dict(engine, "DICTUADDGETB", keyreader_from_uint, CNV | INV | SETGET, valwriter_add_builder)
 }
 
 // (cell uint slice nbits - (slice -1) | (slice cell 0))
 pub(super) fn execute_dictuaddgetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUADDGETREF",
-        keyreader_from_uint,
-        INV | SETGET,
-        valwriter_add_ref,
-    )
+    dict(engine, "DICTUADDGETREF", keyreader_from_uint, INV | SETGET, valwriter_add_ref)
 }
 
 // (cell uint slice nbits - (slice -1) | (slice 0))
@@ -1284,46 +964,22 @@ pub(super) fn execute_dictuaddref(engine: &mut Engine) -> Status {
 
 // (uint slice nbits - (slice' -1) | (slice 0))
 pub(super) fn execute_dictudel(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUDEL",
-        keyreader_from_uint,
-        DEL | RET,
-        valwriter_remove_slice,
-    )
+    dict(engine, "DICTUDEL", keyreader_from_uint, DEL | RET, valwriter_remove_slice)
 }
 
 // (uint slice nbits - (slice value -1) | (slice 0))
 pub(super) fn execute_dictudelget(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUDELGET",
-        keyreader_from_uint,
-        DEL | GET | RET,
-        valwriter_remove_slice,
-    )
+    dict(engine, "DICTUDELGET", keyreader_from_uint, DEL | GET | RET, valwriter_remove_slice)
 }
 
 // (uint slice nbits - (slice cell -1) | (slice 0))
 pub(super) fn execute_dictudelgetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUDELGETREF",
-        keyreader_from_uint,
-        DEL | GET | RET,
-        valwriter_remove_ref,
-    )
+    dict(engine, "DICTUDELGETREF", keyreader_from_uint, DEL | GET | RET, valwriter_remove_ref)
 }
 
 // (uint slice nbits - (value -1) | (0))
 pub(super) fn execute_dictuget(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUGET",
-        keyreader_from_uint,
-        GET | RET,
-        valreader_from_slice,
-    )
+    dict(engine, "DICTUGET", keyreader_from_uint, GET | RET, valreader_from_slice)
 }
 
 // (uint slice nbits - (value key -1) | (0))
@@ -1348,13 +1004,7 @@ pub(super) fn execute_dictugetpreveq(engine: &mut Engine) -> Status {
 
 // (uint slice nbits - (cell -1) | (0))
 pub(super) fn execute_dictugetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUGETREF",
-        keyreader_from_uint,
-        GET | RET,
-        valreader_from_ref,
-    )
+    dict(engine, "DICTUGETREF", keyreader_from_uint, GET | RET, valreader_from_ref)
 }
 
 // (slice nbits - (value uint -1) | (0))
@@ -1399,134 +1049,62 @@ pub(super) fn execute_dicturemminref(engine: &mut Engine) -> Status {
 
 // (value uint slice nbits - (slice -1) | (slice 0))
 pub(super) fn execute_dictureplace(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUREPLACE",
-        keyreader_from_uint,
-        RET | SET,
-        valwriter_replace_slice,
-    )
+    dict(engine, "DICTUREPLACE", keyreader_from_uint, RET | SET, valwriter_replace_slice)
 }
 
 // (builder uint slice nbits - (slice -1) | (slice 0))
 pub(super) fn execute_dictureplaceb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUREPLACEB",
-        keyreader_from_uint,
-        CNV | RET | SET,
-        valwriter_replace_builder,
-    )
+    dict(engine, "DICTUREPLACEB", keyreader_from_uint, CNV | RET | SET, valwriter_replace_builder)
 }
 
 // (value uint slice nbits - (slice value -1) | (slice 0))
 pub(super) fn execute_dictureplaceget(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUREPLACEGET",
-        keyreader_from_uint,
-        SETGET,
-        valwriter_replace_slice,
-    )
+    dict(engine, "DICTUREPLACEGET", keyreader_from_uint, SETGET, valwriter_replace_slice)
 }
 
 // (builder uint slice nbits - (slice value -1) | (slice 0))
 pub(super) fn execute_dictureplacegetb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUREPLACEGETB",
-        keyreader_from_uint,
-        CNV | SETGET,
-        valwriter_replace_builder,
-    )
+    dict(engine, "DICTUREPLACEGETB", keyreader_from_uint, CNV | SETGET, valwriter_replace_builder)
 }
 
 // (cell uint slice nbits - (slice' cell -1) | (slice 0))
 pub(super) fn execute_dictureplacegetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUREPLACEGETREF",
-        keyreader_from_uint,
-        SETGET,
-        valwriter_replace_ref,
-    )
+    dict(engine, "DICTUREPLACEGETREF", keyreader_from_uint, SETGET, valwriter_replace_ref)
 }
 
 // (cell uint slice nbits - (slice -1) | (slice 0))
 pub(super) fn execute_dictureplaceref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUREPLACEREF",
-        keyreader_from_uint,
-        RET | SET,
-        valwriter_replace_ref,
-    )
+    dict(engine, "DICTUREPLACEREF", keyreader_from_uint, RET | SET, valwriter_replace_ref)
 }
 
 // (value uint slice nbits - slice)
 pub(super) fn execute_dictuset(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUSET",
-        keyreader_from_uint,
-        SET,
-        valwriter_to_slice,
-    )
+    dict(engine, "DICTUSET", keyreader_from_uint, SET, valwriter_to_slice)
 }
 
 // (builder uint slice nbits - slice)
 pub(super) fn execute_dictusetb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUSETB",
-        keyreader_from_uint,
-        CNV | SET,
-        valwriter_to_builder,
-    )
+    dict(engine, "DICTUSETB", keyreader_from_uint, CNV | SET, valwriter_to_builder)
 }
 
 // (value uint slice nbits - (slice y -1) | (slice 0))
 pub(super) fn execute_dictusetget(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUSETGET",
-        keyreader_from_uint,
-        SETGET,
-        valwriter_to_slice,
-    )
+    dict(engine, "DICTUSETGET", keyreader_from_uint, SETGET, valwriter_to_slice)
 }
 
 // (builder uint slice nbits - (slice' y -1) | (slice' 0))
 pub(super) fn execute_dictusetgetb(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUSETGETB",
-        keyreader_from_uint,
-        CNV | SETGET,
-        valwriter_to_builder,
-    )
+    dict(engine, "DICTUSETGETB", keyreader_from_uint, CNV | SETGET, valwriter_to_builder)
 }
 
 // (cell uint slice nbits - (slice cell -1) | (slice 0))
 pub(super) fn execute_dictusetgetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUSETGETREF",
-        keyreader_from_uint,
-        SETGET,
-        valwriter_to_ref,
-    )
+    dict(engine, "DICTUSETGETREF", keyreader_from_uint, SETGET, valwriter_to_ref)
 }
 
 // (cell uint slice nbits - slice)
 pub(super) fn execute_dictusetref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUSETREF",
-        keyreader_from_uint,
-        SET,
-        valwriter_to_ref,
-    )
+    dict(engine, "DICTUSETREF", keyreader_from_uint, SET, valwriter_to_ref)
 }
 
 pub(super) fn execute_dictpushconst(engine: &mut Engine) -> Status {
@@ -1719,32 +1297,17 @@ fn subdict(
 
 // prefix lbits dict nbits - dict'
 pub(super) fn execute_subdictget(engine: &mut Engine) -> Status {
-    subdict(
-        engine,
-        "SUBDICTGET",
-        keyreader_from_slice,
-        HashmapSubtree::into_subtree_with_prefix,
-    )
+    subdict(engine, "SUBDICTGET", keyreader_from_slice, HashmapSubtree::into_subtree_with_prefix)
 }
 
 // prefix lbits dict nbits - dict'
 pub(super) fn execute_subdictiget(engine: &mut Engine) -> Status {
-    subdict(
-        engine,
-        "SUBDICTIGET",
-        keyreader_from_int,
-        HashmapSubtree::into_subtree_with_prefix,
-    )
+    subdict(engine, "SUBDICTIGET", keyreader_from_int, HashmapSubtree::into_subtree_with_prefix)
 }
 
 // prefix lbits dict nbits - dict'
 pub(super) fn execute_subdictuget(engine: &mut Engine) -> Status {
-    subdict(
-        engine,
-        "SUBDICTUGET",
-        keyreader_from_uint,
-        HashmapSubtree::into_subtree_with_prefix,
-    )
+    subdict(engine, "SUBDICTUGET", keyreader_from_uint, HashmapSubtree::into_subtree_with_prefix)
 }
 
 // prefix lbits dict nbits - dict'
@@ -1777,33 +1340,15 @@ pub(super) fn execute_subdicturpget(engine: &mut Engine) -> Status {
     )
 }
 pub(super) fn execute_dictgetoptref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTGETOPTREF",
-        keyreader_from_slice,
-        GET,
-        valreader_from_refopt,
-    )
+    dict(engine, "DICTGETOPTREF", keyreader_from_slice, GET, valreader_from_refopt)
 }
 
 pub(super) fn execute_dictigetoptref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTIGETOPTREF",
-        keyreader_from_int,
-        GET,
-        valreader_from_refopt,
-    )
+    dict(engine, "DICTIGETOPTREF", keyreader_from_int, GET, valreader_from_refopt)
 }
 
 pub(super) fn execute_dictugetoptref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTUGETOPTREF",
-        keyreader_from_uint,
-        GET,
-        valreader_from_refopt,
-    )
+    dict(engine, "DICTUGETOPTREF", keyreader_from_uint, GET, valreader_from_refopt)
 }
 
 pub(super) fn execute_dictsetgetoptref(engine: &mut Engine) -> Status {
@@ -1817,13 +1362,7 @@ pub(super) fn execute_dictsetgetoptref(engine: &mut Engine) -> Status {
 }
 
 pub(super) fn execute_dictisetgetoptref(engine: &mut Engine) -> Status {
-    dict(
-        engine,
-        "DICTISETGETOPTREF",
-        keyreader_from_int,
-        SET | GET,
-        valwriter_add_or_remove_refopt,
-    )
+    dict(engine, "DICTISETGETOPTREF", keyreader_from_int, SET | GET, valwriter_add_or_remove_refopt)
 }
 
 pub(super) fn execute_dictusetgetoptref(engine: &mut Engine) -> Status {

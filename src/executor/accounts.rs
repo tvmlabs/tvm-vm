@@ -1,42 +1,58 @@
-/*
-* Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    error::TvmError,
-    executor::engine::Engine,
-    stack::StackItem,
-    types::{Exception, Status},
-};
-use num::{BigUint, ToPrimitive};
-use std::{
-    cmp::{min, Ordering},
-    collections::HashMap,
-    sync::Arc,
-};
-use tvm_block::{
-    Account, ConfigParam1, ConfigParam15, ConfigParam16, ConfigParam17, ConfigParam34,
-    DelectorParams, Deserializable, GlobalCapabilities, Grams, MsgAddress, MsgAddressInt,
-    Serializable, ShardAccount, SigPubKey, ValidatorDescr, ValidatorSet,
-};
-use tvm_types::{
-    error, fail, BuilderData, Cell, ExceptionCode, GasConsumer, HashmapE, IBitstring, Result,
-    SliceData, UInt256,
-};
+use std::cmp::min;
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::sync::Arc;
 
-use super::{
-    engine::{storage::fetch_stack, IndexProvider},
-    types::Instruction,
-};
+use num::BigUint;
+use num::ToPrimitive;
+use tvm_block::Account;
+use tvm_block::ConfigParam1;
+use tvm_block::ConfigParam15;
+use tvm_block::ConfigParam16;
+use tvm_block::ConfigParam17;
+use tvm_block::ConfigParam34;
+use tvm_block::DelectorParams;
+use tvm_block::Deserializable;
+use tvm_block::GlobalCapabilities;
+use tvm_block::Grams;
+use tvm_block::MsgAddress;
+use tvm_block::MsgAddressInt;
+use tvm_block::Serializable;
+use tvm_block::ShardAccount;
+use tvm_block::SigPubKey;
+use tvm_block::ValidatorDescr;
+use tvm_block::ValidatorSet;
+use tvm_types::error;
+use tvm_types::fail;
+use tvm_types::BuilderData;
+use tvm_types::Cell;
+use tvm_types::ExceptionCode;
+use tvm_types::GasConsumer;
+use tvm_types::HashmapE;
+use tvm_types::IBitstring;
+use tvm_types::Result;
+use tvm_types::SliceData;
+use tvm_types::UInt256;
+
+use super::engine::storage::fetch_stack;
+use super::engine::IndexProvider;
+use super::types::Instruction;
+use crate::error::TvmError;
+use crate::executor::engine::Engine;
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::Status;
 
 #[derive(Debug, Default)]
 struct Staker {
@@ -163,10 +179,7 @@ struct SimpleAddress {
 
 impl SimpleAddress {
     fn with_params(workchain_id: i32, address: UInt256) -> Self {
-        Self {
-            workchain_id,
-            address,
-        }
+        Self { workchain_id, address }
     }
 }
 
@@ -193,8 +206,10 @@ impl ElectionResult {
             list: Vec::new(),
             total_weight: 0,
             total_stake: 0,
-            frozen: HashmapE::with_bit_len(256), // pub_key => (workchain_id + address), weight u64, stake u128, banned bool
-            credits: HashmapE::with_hashmap(32 + 256, credits), // (workchain_id + address) => (stake: u128)
+            frozen: HashmapE::with_bit_len(256), /* pub_key => (workchain_id + address), weight
+                                                  * u64, stake u128, banned bool */
+            credits: HashmapE::with_hashmap(32 + 256, credits), /* (workchain_id + address) =>
+                                                                 * (stake: u128) */
         }
     }
 }
@@ -238,7 +253,8 @@ fn calculate_elections(
         // it can overrun u128 so use BigUint
         let stake_big = BigUint::from(validator.key.stake.as_u128()) * PRECISION;
         let stake = (stake_big.clone() << 16u8) / validator.max_factor;
-        // println!("{} stake {} time {} big stake: {}", qty, validator.key.stake, validator.time, stake);
+        // println!("{} stake {} time {} big stake: {}", qty, validator.key.stake,
+        // validator.time, stake);
         wholes_stakes.insert(StakeAndFactor { stake, validator });
         while let Some(e) = wholes_stakes.last() {
             if e.stake < stake_big {
@@ -256,19 +272,16 @@ fn calculate_elections(
             best_stake = total_stake;
             m = qty + 1;
             m_stake = validator.key.stake.as_u128();
-            // } else { println!("{}: total stake {} is not grown {}", qty, total_stake, best_stake);
+            // } else { println!("{}: total stake {} is not grown {}", qty,
+            // total_stake, best_stake);
         }
     }
 
-    // println!("n: {} m: {} best_stake: {} max_stake: {}", n, m, best_stake, cfg17.max_stake);
+    // println!("n: {} m: {} best_stake: {} max_stake: {}", n, m, best_stake,
+    // cfg17.max_stake);
 
     if (m == 0) || (best_stake < cfg17.min_total_stake) {
-        return err!(
-            "stake is not enough n: {} m: {} best_stake: {}",
-            n,
-            m,
-            best_stake
-        );
+        return err!("stake is not enough n: {} m: {} best_stake: {}", n, m, best_stake);
     }
     // we have to select first m validators from list l
 
@@ -276,10 +289,8 @@ fn calculate_elections(
     let round_best_stake = best_stake.as_u128();
     let mut best_stake = 0;
     for validator in validators.iter_mut().take(m) {
-        validator.true_stake = min(
-            validator.key.stake.as_u128(),
-            (m_stake * validator.max_factor as u128) >> 16,
-        );
+        validator.true_stake =
+            min(validator.key.stake.as_u128(), (m_stake * validator.max_factor as u128) >> 16);
         best_stake += validator.true_stake;
     }
     let abs = match round_best_stake.cmp(&best_stake) {
@@ -291,11 +302,7 @@ fn calculate_elections(
     // let abs = round_best_stake.abs_diff(best_stake);
     // println!("{} - {} abs score: {}", round_best_stake, best_stake, abs);
     if abs > 1_000_000_000 {
-        return err!(
-            "{} and {} differ more than by 1_000_000_000",
-            best_stake,
-            round_best_stake
-        );
+        return err!("{} and {} differ more than by 1_000_000_000", best_stake, round_best_stake);
     }
     // create both the new validator set and the refund set
     for (i, validator) in validators.drain(..).enumerate() {
@@ -307,9 +314,7 @@ fn calculate_elections(
                 leftover_stake += data.get_next_u128()?
             }
             let leftover_stake = leftover_stake.write_to_new_cell()?;
-            result
-                .credits
-                .set_builder_with_gas(key, &leftover_stake, gas_consumer)?;
+            result.credits.set_builder_with_gas(key, &leftover_stake, gas_consumer)?;
         }
         if i < m {
             result.total_stake += validator.true_stake;
@@ -330,9 +335,7 @@ fn calculate_elections(
             value.append_u64(weight)?;
             value.append_u128(validator.true_stake)?;
             value.append_u8(0)?;
-            result
-                .frozen
-                .set_builder_with_gas(key, &value, gas_consumer)?;
+            result.frozen.set_builder_with_gas(key, &value, gas_consumer)?;
         }
     }
     // m_credits = credits;
@@ -395,7 +398,8 @@ fn process_validator(
     let (pub_key, mut stake) = process_depool(&account, &mut data, gas_consumer)?;
     let max_factor = data.get_next_u32()?;
     let adnl_addr = data.get_next_hash()?;
-    // time now is not implemented in validator contract but left for testing purposes now
+    // time now is not implemented in validator contract but left for testing
+    // purposes now
     let time = !data.get_next_u32().unwrap_or(0);
     let addr = match account.get_addr() {
         Some(addr) => {
@@ -412,19 +416,8 @@ fn process_validator(
     if &stake < min_stake {
         return err!("stake {} is less than min_stake {}", stake, min_stake);
     }
-    let key = ValidatorKey {
-        stake: Grams::new(stake)?,
-        time,
-        pub_key,
-    };
-    Ok(Validator {
-        key,
-        true_stake: 0,
-        max_factor,
-        addr,
-        adnl_addr,
-        mc_seq_no_since: 0,
-    })
+    let key = ValidatorKey { stake: Grams::new(stake)?, time, pub_key };
+    Ok(Validator { key, true_stake: 0, max_factor, addr, adnl_addr, mc_seq_no_since: 0 })
 }
 
 /// determine if staker is valid and return its address and parameters
@@ -443,10 +436,7 @@ fn process_staker(
             let staker = Staker { stake };
             Ok((addr, staker))
         }
-        None => err!(
-            "m_validatorDePool of staker {:?} has wrong address type",
-            account.get_addr()
-        ),
+        None => err!("m_validatorDePool of staker {:?} has wrong address type", account.get_addr()),
     }
 }
 

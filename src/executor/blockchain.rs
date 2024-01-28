@@ -1,40 +1,44 @@
-/*
-* Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    error::TvmError,
-    executor::{
-        engine::{storage::fetch_stack, Engine},
-        serialize_currency_collection,
-        types::Instruction,
-    },
-    stack::{
-        integer::{
-            behavior::OperationBehavior, serialization::UnsignedIntegerBigEndianEncoding,
-            IntegerData,
-        },
-        StackItem,
-    },
-    types::{Exception, Status},
-};
-use num::{bigint::Sign, BigInt};
-use tvm_block::{
-    Deserializable, GlobalCapabilities, MsgAddressInt, ACTION_CHANGE_LIB, ACTION_COPYLEFT,
-    ACTION_RESERVE, ACTION_SEND_MSG, ACTION_SET_CODE,
-};
-use tvm_types::{
-    error, types::ExceptionCode, BuilderData, Cell, GasConsumer, IBitstring, Result, SliceData,
-};
+use num::bigint::Sign;
+use num::BigInt;
+use tvm_block::Deserializable;
+use tvm_block::GlobalCapabilities;
+use tvm_block::MsgAddressInt;
+use tvm_block::ACTION_CHANGE_LIB;
+use tvm_block::ACTION_COPYLEFT;
+use tvm_block::ACTION_RESERVE;
+use tvm_block::ACTION_SEND_MSG;
+use tvm_block::ACTION_SET_CODE;
+use tvm_types::error;
+use tvm_types::types::ExceptionCode;
+use tvm_types::BuilderData;
+use tvm_types::Cell;
+use tvm_types::GasConsumer;
+use tvm_types::IBitstring;
+use tvm_types::Result;
+use tvm_types::SliceData;
+
+use crate::error::TvmError;
+use crate::executor::engine::storage::fetch_stack;
+use crate::executor::engine::Engine;
+use crate::executor::serialize_currency_collection;
+use crate::executor::types::Instruction;
+use crate::stack::integer::behavior::OperationBehavior;
+use crate::stack::integer::serialization::UnsignedIntegerBigEndianEncoding;
+use crate::stack::integer::IntegerData;
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::Status;
 
 fn get_bigint(slice: &SliceData) -> BigInt {
     let bits = slice.remaining_bits();
@@ -73,11 +77,8 @@ pub(super) fn execute_changelib(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("CHANGELIB"))?;
     fetch_stack(engine, 2)?;
     let x = engine.cmd.var(0).as_integer()?.into(0..=2)? as u8;
-    let hash = engine
-        .cmd
-        .var(1)
-        .as_integer()?
-        .as_builder::<UnsignedIntegerBigEndianEncoding>(256)?;
+    let hash =
+        engine.cmd.var(1).as_integer()?.as_builder::<UnsignedIntegerBigEndianEncoding>(256)?;
     let mut suffix = BuilderData::with_raw(vec![x * 2], 8)?;
     suffix.append_builder(&hash)?;
     add_action(engine, ACTION_CHANGE_LIB, None, suffix)
@@ -109,12 +110,7 @@ pub(super) fn execute_setlibcode(engine: &mut Engine) -> Status {
     fetch_stack(engine, 2)?;
     let x = engine.cmd.var(0).as_integer()?.into(0..=2)? as u8;
     let cell = engine.cmd.var(1).as_cell()?.clone();
-    add_action(
-        engine,
-        ACTION_CHANGE_LIB,
-        Some(cell),
-        BuilderData::with_raw(vec![x * 2 + 1], 8)?,
-    )
+    add_action(engine, ACTION_CHANGE_LIB, Some(cell), BuilderData::with_raw(vec![x * 2 + 1], 8)?)
 }
 
 /// COPYLEFT (s n - )
@@ -222,11 +218,7 @@ where
 pub(super) fn execute_parsemsgaddr<T: OperationBehavior>(engine: &mut Engine) -> Status {
     load_address::<_, T>(
         engine,
-        if T::quiet() {
-            "PARSEMSGADDRQ"
-        } else {
-            "PARSEMSGADDR"
-        },
+        if T::quiet() { "PARSEMSGADDRQ" } else { "PARSEMSGADDR" },
         |tuple, _| Ok(vec![StackItem::tuple(tuple)]),
     )
 }
@@ -235,11 +227,7 @@ pub(super) fn execute_parsemsgaddr<T: OperationBehavior>(engine: &mut Engine) ->
 pub(super) fn execute_rewrite_std_addr<T: OperationBehavior>(engine: &mut Engine) -> Status {
     load_address::<_, T>(
         engine,
-        if T::quiet() {
-            "REWRITESTDADDRQ"
-        } else {
-            "REWRITESTDADDR"
-        },
+        if T::quiet() { "REWRITESTDADDRQ" } else { "REWRITESTDADDR" },
         |tuple, _| {
             if tuple.len() == 4 {
                 let addr = tuple[3].as_slice()?;
@@ -271,11 +259,7 @@ pub(super) fn execute_rewrite_std_addr<T: OperationBehavior>(engine: &mut Engine
 pub(super) fn execute_rewrite_var_addr<T: OperationBehavior>(engine: &mut Engine) -> Status {
     load_address::<_, T>(
         engine,
-        if T::quiet() {
-            "REWRITEVARADDRQ"
-        } else {
-            "REWRITEVARADDR"
-        },
+        if T::quiet() { "REWRITEVARADDRQ" } else { "REWRITEVARADDR" },
         |tuple, gas_consumer| {
             if tuple.len() == 4 {
                 let mut addr = tuple[3].as_slice()?.clone();

@@ -1,28 +1,39 @@
-/*
-* Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
+use std::mem;
+use std::ops::Range;
+
+use tvm_types::error;
+use tvm_types::fail;
+use tvm_types::types::ExceptionCode;
+use tvm_types::Result;
+
+use crate::error::TvmError;
+use crate::executor::engine::Engine;
 use crate::executor::gas::gas_state::Gas;
-use crate::{
-    error::TvmError,
-    executor::{
-        engine::Engine,
-        microcode::{CC, CC_SAVELIST, CTRL, CTRL_SAVELIST, STACK, VAR, VAR_SAVELIST},
-    },
-    stack::{continuation::ContinuationData, savelist::SaveList, StackItem},
-    types::{Exception, ResultMut, ResultRef, Status},
-};
-use std::{mem, ops::Range};
-use tvm_types::{error, fail, types::ExceptionCode, Result};
+use crate::executor::microcode::CC;
+use crate::executor::microcode::CC_SAVELIST;
+use crate::executor::microcode::CTRL;
+use crate::executor::microcode::CTRL_SAVELIST;
+use crate::executor::microcode::STACK;
+use crate::executor::microcode::VAR;
+use crate::executor::microcode::VAR_SAVELIST;
+use crate::stack::continuation::ContinuationData;
+use crate::stack::savelist::SaveList;
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::ResultMut;
+use crate::types::ResultRef;
+use crate::types::Status;
 
 // Utilities ******************************************************************
 
@@ -41,10 +52,7 @@ fn continuation_by_address(engine: &mut Engine, address: u16) -> ResultRef<Conti
 macro_rules! continuation_mut_by_address {
     ($engine:ident, $address:expr) => {
         match address_tag!($address) {
-            VAR => $engine
-                .cmd
-                .var_mut(storage_index!($address))
-                .as_continuation_mut(),
+            VAR => $engine.cmd.var_mut(storage_index!($address)).as_continuation_mut(),
             CTRL => match $engine.ctrls.get_mut(storage_index!($address)) {
                 Some(ctrl) => ctrl.as_continuation_mut(),
                 None => fail!(ExceptionCode::TypeCheckError),
@@ -108,6 +116,7 @@ impl Info {
             _ => fail!("Info.item {:x}\n", self.flags),
         }
     }
+
     #[rustfmt::skip]
     fn list<'a>(&mut self, engine: &'a mut Engine) -> ResultMut<'a, SaveList> {
         match address_tag!(self.flags) {
@@ -141,11 +150,7 @@ fn put_to_list(engine: &mut Engine, x: &mut Info, y: &mut StackItem) -> Result<O
 fn put_to_list_from_item(engine: &mut Engine, x: &mut Info, y: &Info) -> Result<Option<StackItem>> {
     if !SaveList::can_put(x.index, y.item(engine)?) {
         if log::log_enabled!(log::Level::Error) {
-            let value = x
-                .list(engine)?
-                .get(x.index)
-                .cloned()
-                .unwrap_or_else(StackItem::default);
+            let value = x.list(engine)?.get(x.index).cloned().unwrap_or_else(StackItem::default);
             log::error!(
                 target: "tvm",
                 "Cannot set: {} to list with index: {} and value: {}",
@@ -173,16 +178,8 @@ fn put_to_list_from_list(
         }
     }
     if log::log_enabled!(log::Level::Error) {
-        let old = x
-            .list(engine)?
-            .get(x.index)
-            .cloned()
-            .unwrap_or_else(StackItem::default);
-        let new = y
-            .list(engine)?
-            .get(y.index)
-            .cloned()
-            .unwrap_or_else(StackItem::default);
+        let old = x.list(engine)?.get(x.index).cloned().unwrap_or_else(StackItem::default);
+        let new = y.list(engine)?.get(y.index).cloned().unwrap_or_else(StackItem::default);
         log::error!(
             target: "tvm",
             "Cannot set: {} to list with index: {} and value: {}",
@@ -219,14 +216,8 @@ pub(in crate::executor) fn swap(engine: &mut Engine, mut x: u16, mut y: u16) -> 
     if address_tag!(x) > address_tag!(y) {
         mem::swap(&mut x, &mut y);
     }
-    let x = Info {
-        flags: x,
-        index: storage_index!(x),
-    };
-    let y = Info {
-        flags: y,
-        index: storage_index!(y),
-    };
+    let x = Info { flags: x, index: storage_index!(x) };
+    let y = Info { flags: y, index: storage_index!(y) };
     match address_tag!(x.flags) {
         CC_SAVELIST | CTRL | CTRL_SAVELIST | VAR_SAVELIST => match address_tag!(y.flags) {
             CC_SAVELIST | CTRL | CTRL_SAVELIST | VAR_SAVELIST => swap_between_lists(engine, x, y),
@@ -242,10 +233,7 @@ pub(in crate::executor) fn swap(engine: &mut Engine, mut x: u16, mut y: u16) -> 
                 None => err!(ExceptionCode::TypeCheckError),
             },
             VAR => {
-                mem::swap(
-                    engine.cmd.var_mut(y.index).as_continuation_mut()?,
-                    &mut engine.cc,
-                );
+                mem::swap(engine.cmd.var_mut(y.index).as_continuation_mut()?, &mut engine.cc);
                 Ok(())
             }
             _ => fail!("swap CC-{:X}", y),
@@ -287,15 +275,11 @@ pub(in crate::executor) fn copy_to_var(engine: &mut Engine, src: u16) -> Status 
             let copy = engine.cc.copy_without_stack();
             StackItem::continuation(copy)
         }
-        CTRL => engine
-            .ctrls
-            .get(storage_index!(src))
-            .cloned()
-            .unwrap_or_default(),
+        CTRL => engine.ctrls.get(storage_index!(src)).cloned().unwrap_or_default(),
         // CTRL => match engine.ctrls.get(storage_index!(src)) {
         //     Some(ctrl) => ctrl.clone(),
-        //     None => return err!(ExceptionCode::TypeCheckError, "read empty control register {}", storage_index!(src))
-        // }
+        //     None => return err!(ExceptionCode::TypeCheckError, "read empty control register {}",
+        // storage_index!(src)) }
         STACK => engine.cc.stack.get(stack_index!(src)).clone(),
         VAR => engine.cmd.var(storage_index!(src)).clone(),
         _ => fail!("copy_to_var: {}", src),
@@ -319,10 +303,7 @@ pub(in crate::executor) fn fetch_stack(engine: &mut Engine, depth: usize) -> Sta
     if engine.cc.stack.depth() < depth {
         err!(ExceptionCode::StackUnderflow)
     } else {
-        engine
-            .cmd
-            .vars
-            .append(&mut engine.cc.stack.drop_range(0..depth)?);
+        engine.cmd.vars.append(&mut engine.cc.stack.drop_range(0..depth)?);
         Ok(())
     }
 }
@@ -349,11 +330,7 @@ pub(in crate::executor) fn pop_all(engine: &mut Engine, dst: u16) -> Status {
     } else {
         nargs as usize
     };
-    if drop > 0 {
-        pop_range(engine, 0..drop, dst)
-    } else {
-        Ok(())
-    }
+    if drop > 0 { pop_range(engine, 0..drop, dst) } else { Ok(()) }
 }
 
 // dst.stack.push(CC.stack[range])

@@ -1,33 +1,29 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    error::TvmError,
-    stack::{
-        integer::{
-            serialization::{
-                common::{calc_excess_bits, extend_buffer_be},
-                Encoding,
-            },
-            IntegerData,
-        },
-        serialization::{Deserializer, Serializer},
-    },
-    types::Exception,
-};
 use num::bigint::ToBigInt;
 use num_traits::Signed;
-use tvm_types::{error, BuilderData, ExceptionCode, Result};
+use tvm_types::error;
+use tvm_types::BuilderData;
+use tvm_types::ExceptionCode;
+use tvm_types::Result;
+
+use crate::error::TvmError;
+use crate::stack::integer::serialization::common::calc_excess_bits;
+use crate::stack::integer::serialization::common::extend_buffer_be;
+use crate::stack::integer::serialization::Encoding;
+use crate::stack::integer::IntegerData;
+use crate::stack::serialization::Deserializer;
+use crate::stack::serialization::Serializer;
+use crate::types::Exception;
 
 pub struct SignedIntegerBigEndianEncoding {
     length_in_bits: usize,
@@ -43,10 +39,9 @@ impl Serializer<IntegerData> for SignedIntegerBigEndianEncoding {
     fn try_serialize(&self, value: &IntegerData) -> Result<BuilderData> {
         if !value.fits_in(self.length_in_bits)? {
             // Spec. 3.2.7
-            // * If the integer x to be serialized is not in the range
-            //   −2^(n−1) <= x < 2^(n−1) (for signed integer serialization)
-            //   or 0 <= x < 2^n (for unsigned integer serialization),
-            //   a range check exception is usually generated
+            // * If the integer x to be serialized is not in the range −2^(n−1) <= x <
+            //   2^(n−1) (for signed integer serialization) or 0 <= x < 2^n (for unsigned
+            //   integer serialization), a range check exception is usually generated
             return err!(
                 ExceptionCode::RangeCheckError,
                 "{} is not fit in {}",

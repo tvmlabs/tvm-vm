@@ -1,18 +1,19 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use super::{Stack, StackItem};
-use tvm_types::{BuilderData, SliceData};
+use tvm_types::BuilderData;
+use tvm_types::SliceData;
+
+use super::Stack;
+use super::StackItem;
 
 #[test]
 fn test_push_increases_depth() {
@@ -74,12 +75,8 @@ mod test_serialization {
         cont.stack.push(item);
         let tuple = vec![StackItem::int(888), StackItem::int(1234)];
         cont.savelist.put(7, &mut StackItem::tuple(tuple)).unwrap();
-        cont.savelist
-            .put(4, &mut StackItem::cell(Default::default()))
-            .unwrap();
-        cont.savelist
-            .put(0, &mut StackItem::continuation(cont.clone()))
-            .unwrap();
+        cont.savelist.put(4, &mut StackItem::cell(Default::default())).unwrap();
+        cont.savelist.put(0, &mut StackItem::continuation(cont.clone())).unwrap();
         cont
     }
 

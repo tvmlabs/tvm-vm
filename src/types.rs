@@ -1,19 +1,21 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::stack::{integer::IntegerData, StackItem};
 use std::fmt;
-use tvm_types::{types::ExceptionCode, Result};
+
+use tvm_types::types::ExceptionCode;
+use tvm_types::Result;
+
+use crate::stack::integer::IntegerData;
+use crate::stack::StackItem;
 
 #[derive(Clone, PartialEq)]
 enum ExceptionType {
@@ -32,26 +34,22 @@ impl ExceptionType {
             _ => None,
         }
     }
+
     fn exception_code(&self) -> Option<ExceptionCode> {
-        if let ExceptionType::System(code) = self {
-            Some(*code)
-        } else {
-            None
-        }
+        if let ExceptionType::System(code) = self { Some(*code) } else { None }
     }
+
     fn custom_code(&self) -> Option<i32> {
-        if let ExceptionType::Custom(code) = self {
-            Some(*code)
-        } else {
-            None
-        }
+        if let ExceptionType::Custom(code) = self { Some(*code) } else { None }
     }
+
     pub fn exception_or_custom_code(&self) -> i32 {
         match self {
             ExceptionType::System(code) => *code as i32,
             ExceptionType::Custom(code) => *code,
         }
     }
+
     fn exception_message(&self) -> String {
         match self {
             ExceptionType::System(code) => format!("{}, code {}", code, *code as u8),
@@ -86,9 +84,11 @@ impl Exception {
             self.line
         )
     }
+
     pub fn from_code(code: ExceptionCode, file: &'static str, line: u32) -> Exception {
         Self::from_code_and_value(code, 0, file, line)
     }
+
     pub fn from_code_and_value(
         code: ExceptionCode,
         value: impl Into<IntegerData>,
@@ -103,28 +103,28 @@ impl Exception {
             line,
         }
     }
+
     pub fn from_number_and_value(
         number: usize,
         value: StackItem,
         file: &'static str,
         line: u32,
     ) -> Exception {
-        Exception {
-            exception: ExceptionType::Custom(number as i32),
-            value,
-            file,
-            line,
-        }
+        Exception { exception: ExceptionType::Custom(number as i32), value, file, line }
     }
+
     pub fn exception_code(&self) -> Option<ExceptionCode> {
         self.exception.exception_code()
     }
+
     pub fn custom_code(&self) -> Option<i32> {
         self.exception.custom_code()
     }
+
     pub fn exception_or_custom_code(&self) -> i32 {
         self.exception.exception_or_custom_code()
     }
+
     pub fn is_normal_termination(&self) -> Option<i32> {
         self.exception.is_normal_termination()
     }

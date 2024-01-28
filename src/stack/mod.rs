@@ -1,29 +1,49 @@
-/*
-* Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use self::{continuation::ContinuationData, integer::IntegerData, savelist::SaveList};
-use crate::{
-    error::TvmError,
-    executor::gas::gas_state::Gas,
-    types::{Exception, ResultMut, ResultOpt, ResultRef, ResultVec, Status},
-};
-use integer::serialization::{Encoding, SignedIntegerBigEndianEncoding};
+use std::cmp::Ordering;
+use std::fmt;
+use std::mem;
+use std::ops::Range;
+use std::slice::Iter;
+use std::sync::Arc;
+
+use integer::serialization::Encoding;
+use integer::serialization::SignedIntegerBigEndianEncoding;
 use serialization::Deserializer;
-use std::{cmp::Ordering, fmt, mem, ops::Range, slice::Iter, sync::Arc};
-use tvm_types::{
-    error, BuilderData, Cell, CellType, ExceptionCode, GasConsumer, HashmapE, HashmapType,
-    IBitstring, Result, SliceData, MAX_DATA_BITS, MAX_REFERENCES_COUNT,
-};
+use tvm_types::error;
+use tvm_types::BuilderData;
+use tvm_types::Cell;
+use tvm_types::CellType;
+use tvm_types::ExceptionCode;
+use tvm_types::GasConsumer;
+use tvm_types::HashmapE;
+use tvm_types::HashmapType;
+use tvm_types::IBitstring;
+use tvm_types::Result;
+use tvm_types::SliceData;
+use tvm_types::MAX_DATA_BITS;
+use tvm_types::MAX_REFERENCES_COUNT;
+
+use self::continuation::ContinuationData;
+use self::integer::IntegerData;
+use self::savelist::SaveList;
+use crate::error::TvmError;
+use crate::executor::gas::gas_state::Gas;
+use crate::types::Exception;
+use crate::types::ResultMut;
+use crate::types::ResultOpt;
+use crate::types::ResultRef;
+use crate::types::ResultVec;
+use crate::types::Status;
 
 pub mod continuation;
 pub mod savelist;
@@ -36,13 +56,13 @@ macro_rules! int {
     (nan) => {
         StackItem::nan()
     };
-    ($value: expr) => {
+    ($value:expr) => {
         StackItem::integer(IntegerData::from($value).unwrap())
     };
-    (parse $str: expr) => {
+    (parse $str:expr) => {
         StackItem::integer(std::str::FromStr::from_str($str).unwrap())
     };
-    (parse_hex $str: expr) => {
+    (parse_hex $str:expr) => {
         StackItem::integer(IntegerData::from_str_radix($str, 16).unwrap())
     };
 }
@@ -50,11 +70,7 @@ macro_rules! int {
 #[macro_export]
 macro_rules! boolean {
     ($val:expr) => {
-        if $val {
-            int!(-1)
-        } else {
-            int!(0)
-        }
+        if $val { int!(-1) } else { int!(0) }
     };
 }
 
@@ -238,11 +254,7 @@ fn items_serialize(
 fn prepare_savelist_serialize_vars<'a>(savelist: &'a SaveList, items: &mut Vec<SerializeItem<'a>>) {
     for index in 0..SaveList::NUMREGS {
         if let Some(item) = savelist.get(index) {
-            items.push(SerializeItem::SaveListItem(if index == 6 {
-                7
-            } else {
-                index
-            }));
+            items.push(SerializeItem::SaveListItem(if index == 6 { 7 } else { index }));
             items.push(SerializeItem::Item(item));
         }
     }
@@ -446,22 +458,14 @@ impl StackItem {
     pub fn as_continuation(&self) -> ResultRef<ContinuationData> {
         match self {
             StackItem::Continuation(ref data) => Ok(data),
-            _ => err!(
-                ExceptionCode::TypeCheckError,
-                "item {} is not a continuation",
-                self
-            ),
+            _ => err!(ExceptionCode::TypeCheckError, "item {} is not a continuation", self),
         }
     }
 
     pub fn as_continuation_mut(&mut self) -> ResultMut<ContinuationData> {
         match self {
             StackItem::Continuation(data) => Ok(Arc::make_mut(data)),
-            _ => err!(
-                ExceptionCode::TypeCheckError,
-                "item {} is not a continuation",
-                self
-            ),
+            _ => err!(ExceptionCode::TypeCheckError, "item {} is not a continuation", self),
         }
     }
 
@@ -495,22 +499,14 @@ impl StackItem {
     pub fn as_slice(&self) -> ResultRef<SliceData> {
         match self {
             StackItem::Slice(data) => Ok(data),
-            _ => err!(
-                ExceptionCode::TypeCheckError,
-                "item {} is not a slice",
-                self
-            ),
+            _ => err!(ExceptionCode::TypeCheckError, "item {} is not a slice", self),
         }
     }
 
     pub fn as_tuple(&self) -> ResultRef<[StackItem]> {
         match self {
             StackItem::Tuple(data) => Ok(data),
-            _ => err!(
-                ExceptionCode::TypeCheckError,
-                "item {} is not a tuple",
-                self
-            ),
+            _ => err!(ExceptionCode::TypeCheckError, "item {} is not a tuple", self),
         }
     }
 
@@ -616,11 +612,7 @@ impl StackItem {
                 };
                 let d2 = |bits: u32| {
                     let res = ((bits / 8) * 2) as u8;
-                    if bits & 7 != 0 {
-                        res + 1
-                    } else {
-                        res
-                    }
+                    if bits & 7 != 0 { res + 1 } else { res }
                 };
                 let start = data.pos();
                 let end = start + data.remaining_bits();
@@ -657,10 +649,7 @@ impl StackItem {
                 } else {
                     format!(
                         "[ {} ]",
-                        data.iter()
-                            .map(|v| v.dump_as_fift())
-                            .collect::<Vec<_>>()
-                            .join(" ")
+                        data.iter().map(|v| v.dump_as_fift()).collect::<Vec<_>>().join(" ")
                     )
                 }
             }
@@ -766,13 +755,7 @@ impl StackItem {
                 list.push(DeserializeItem::Items(length, tuple_slice));
                 return Ok(None);
             }
-            typ => {
-                return err!(
-                    ExceptionCode::UnknownError,
-                    "unknown StackItem type {}",
-                    typ
-                )
-            }
+            typ => return err!(ExceptionCode::UnknownError, "unknown StackItem type {}", typ),
         };
         Ok(Some(item))
     }
@@ -923,9 +906,7 @@ pub struct Stack {
 
 impl Stack {
     pub const fn new() -> Self {
-        Stack {
-            storage: Vec::new(),
-        }
+        Stack { storage: Vec::new() }
     }
 
     pub const fn with_storage(storage: Vec<StackItem>) -> Self {
@@ -990,11 +971,7 @@ impl Stack {
                 depth
             )
         } else {
-            Ok(self
-                .storage
-                .drain(depth - range.end..depth - range.start)
-                .rev()
-                .collect())
+            Ok(self.storage.drain(depth - range.end..depth - range.start).rev().collect())
         }
     }
 
@@ -1019,10 +996,9 @@ impl Stack {
                 std::mem::swap(&mut rem, &mut self.storage);
                 Ok(rem)
             }
-            Ordering::Less => Ok(self
-                .storage
-                .drain(depth - range.end..depth - range.start)
-                .collect()),
+            Ordering::Less => {
+                Ok(self.storage.drain(depth - range.end..depth - range.start).collect())
+            }
         }
     }
 
@@ -1044,21 +1020,25 @@ impl Stack {
         self.storage.insert(depth - i, item);
         self
     }
+
     /// pushes a new var to stack
     pub fn push(&mut self, item: StackItem) -> &mut Stack {
         self.storage.push(item);
         self
     }
+
     /// pushes a builder as new var to stack
     pub fn push_builder(&mut self, item: BuilderData) -> &mut Stack {
         self.storage.push(StackItem::builder(item));
         self
     }
+
     /// pushes a continuation as new var to stack
     pub fn push_cont(&mut self, item: ContinuationData) -> &mut Stack {
         self.storage.push(StackItem::continuation(item));
         self
     }
+
     /// pushes a vector as tuple
     pub fn push_tuple(&mut self, items: Vec<StackItem>) -> &mut Stack {
         self.storage.push(StackItem::tuple(items));
@@ -1073,8 +1053,7 @@ impl Stack {
         } else {
             let length = range.end - range.start;
             for i in 0..length / 2 {
-                self.storage
-                    .swap(depth - range.start - i - 1, depth - range.end + i);
+                self.storage.swap(depth - range.start - i - 1, depth - range.end + i);
             }
             Ok(())
         }
@@ -1191,10 +1170,7 @@ impl PartialEq for Stack {
 impl fmt::Display for Stack {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(
-            &self
-                .storage
-                .iter()
-                .fold(String::new(), |acc, item| format!("{}{}\n", acc, item)),
+            &self.storage.iter().fold(String::new(), |acc, item| format!("{}{}\n", acc, item)),
         )
     }
 }

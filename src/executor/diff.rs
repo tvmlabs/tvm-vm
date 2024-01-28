@@ -1,33 +1,38 @@
-/*
-* Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
+
+use std::io::Cursor;
+use std::io::Read;
+use std::time::Duration;
+use std::time::Instant;
+
+use tvm_block::GlobalCapabilities;
+use tvm_types::error;
+use tvm_types::ExceptionCode;
+use tvm_types::Result;
+use tvm_types::SliceData;
 
 use crate::error::tvm_exception_code;
+use crate::error::TvmError;
+use crate::executor::engine::storage::fetch_stack;
+use crate::executor::engine::Engine;
+use crate::executor::gas::gas_state::Gas;
+use crate::executor::types::Instruction;
 use crate::executor::Mask;
-use crate::{
-    error::TvmError,
-    executor::{
-        engine::{storage::fetch_stack, Engine},
-        gas::gas_state::Gas,
-        types::Instruction,
-    },
-    stack::StackItem,
-    types::{Exception, Status},
-    utils::{bytes_to_string, pack_data_to_cell, unpack_data_from_cell},
-};
-use std::io::{Cursor, Read};
-use std::time::{Duration, Instant};
-use tvm_block::GlobalCapabilities;
-use tvm_types::{error, ExceptionCode, Result, SliceData};
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::Status;
+use crate::utils::bytes_to_string;
+use crate::utils::pack_data_to_cell;
+use crate::utils::unpack_data_from_cell;
 
 const ZIP: u8 = 0x01; // unzip before process and zip after process
 const BINARY: u8 = 0x02; // use binary version functions instead of utf8
@@ -78,18 +83,13 @@ fn process_output_slice(s: &[u8], engine: &mut Engine, how: u8) -> Status {
 
 // Keep for experiments
 fn _diff_diffy_lib(engine: &mut Engine, fst: &str, snd: &str) -> Result<String> {
-    engine.try_use_gas(Gas::diff_fee_for_line(
-        fst.lines().count(),
-        snd.lines().count(),
-    ))?;
+    engine.try_use_gas(Gas::diff_fee_for_line(fst.lines().count(), snd.lines().count()))?;
 
     let mut options = diffy::DiffOptions::default();
     options.set_context_len(0);
     let patch = options.create_patch(fst, snd);
     let result = patch.to_string();
-    let result = result
-        .strip_prefix("--- original\n+++ modified\n")
-        .unwrap_or(&result);
+    let result = result.strip_prefix("--- original\n+++ modified\n").unwrap_or(&result);
 
     engine.try_use_gas(Gas::diff_fee_for_count_patches(patch.hunks().len()))?;
 
@@ -97,16 +97,11 @@ fn _diff_diffy_lib(engine: &mut Engine, fst: &str, snd: &str) -> Result<String> 
 }
 
 fn diff_similar_lib(engine: &mut Engine, fst: &str, snd: &str) -> Result<String> {
-    engine.try_use_gas(Gas::diff_fee_for_line(
-        fst.lines().count(),
-        snd.lines().count(),
-    ))?;
+    engine.try_use_gas(Gas::diff_fee_for_line(fst.lines().count(), snd.lines().count()))?;
 
     let mut config = similar::TextDiffConfig::default();
     let current_time = Instant::now();
-    config
-        .algorithm(similar::Algorithm::Myers)
-        .deadline(current_time + DIFF_TIMEOUT);
+    config.algorithm(similar::Algorithm::Myers).deadline(current_time + DIFF_TIMEOUT);
     let diff = config.diff_lines(fst, snd);
     if current_time.elapsed() >= DIFF_TIMEOUT - Duration::from_millis(1) {
         return err!(ExceptionCode::OutOfGas);
@@ -126,11 +121,7 @@ fn patch_diffy_lib(engine: &mut Engine, str: &str, patch: &str) -> Result<String
     let patch = match diffy::Patch::from_str(patch) {
         Ok(patch) => patch,
         Err(err) => {
-            return Err(exception!(
-                ExceptionCode::TypeCheckError,
-                "Incorrect diff patch: {}",
-                err
-            ));
+            return Err(exception!(ExceptionCode::TypeCheckError, "Incorrect diff patch: {}", err));
         }
     };
 
@@ -204,22 +195,14 @@ fn unzip(engine: &mut Engine, data: &[u8]) -> Result<Vec<u8>> {
 
     let mut cursor = Cursor::new(data);
     let mut decoder = zstd::stream::Decoder::new(&mut cursor).map_err(|err| {
-        exception!(
-            ExceptionCode::UnknownError,
-            "Cannot uncompress data: {}",
-            err
-        )
+        exception!(ExceptionCode::UnknownError, "Cannot uncompress data: {}", err)
     })?;
 
     let mut buffer = vec![0; 10000]; // in heap in order to don't exceed stack
     let mut result = Vec::new();
     loop {
         let res_len = decoder.read(&mut buffer).map_err(|err| {
-            exception!(
-                ExceptionCode::UnknownError,
-                "Cannot uncompress data: {}",
-                err
-            )
+            exception!(ExceptionCode::UnknownError, "Cannot uncompress data: {}", err)
         })?;
         if res_len == 0 {
             break;
@@ -266,11 +249,7 @@ fn execute_patch_with_options(name: &'static str, engine: &mut Engine, how: u8) 
         })()
     };
 
-    if how.bit(IGNORE_ERROR) {
-        ignore_error(engine, result)
-    } else {
-        result
-    }
+    if how.bit(IGNORE_ERROR) { ignore_error(engine, result) } else { result }
 }
 
 /// ZIP (s – c), zip string
@@ -333,12 +312,14 @@ pub(super) fn execute_diff_patch_not_quiet(engine: &mut Engine) -> Status {
     execute_patch_with_options("DIFF_PATCH", engine, 0)
 }
 
-/// DIFF_PATCH_ZIPQ (s s – c), unpack message and diff, patch message and pack result
+/// DIFF_PATCH_ZIPQ (s s – c), unpack message and diff, patch message and pack
+/// result
 pub(super) fn execute_diff_patch_zip_quiet(engine: &mut Engine) -> Status {
     execute_patch_with_options("DIFF_PATCH_ZIPQ", engine, IGNORE_ERROR + ZIP)
 }
 
-/// DIFF_PATCH_ZIP (s s – c), unpack message and diff, patch message and pack result
+/// DIFF_PATCH_ZIP (s s – c), unpack message and diff, patch message and pack
+/// result
 pub(super) fn execute_diff_patch_zip_not_quiet(engine: &mut Engine) -> Status {
     execute_patch_with_options("DIFF_PATCH_ZIP", engine, ZIP)
 }
@@ -353,16 +334,14 @@ pub(super) fn execute_diff_patch_binary_not_quiet(engine: &mut Engine) -> Status
     execute_patch_with_options("DIFF_PATCH_BINARY", engine, BINARY)
 }
 
-/// DIFF_PATCH_BINARY_ZIPQ (s s – c), unpack message and diff, patch message and pack result
+/// DIFF_PATCH_BINARY_ZIPQ (s s – c), unpack message and diff, patch message and
+/// pack result
 pub(super) fn execute_diff_patch_binary_zip_quiet(engine: &mut Engine) -> Status {
-    execute_patch_with_options(
-        "DIFF_PATCH_BINARY_ZIPQ",
-        engine,
-        IGNORE_ERROR + BINARY + ZIP,
-    )
+    execute_patch_with_options("DIFF_PATCH_BINARY_ZIPQ", engine, IGNORE_ERROR + BINARY + ZIP)
 }
 
-/// DIFF_PATCH_BINARY_ZIP (s s – c), unpack message and diff, patch message and pack result
+/// DIFF_PATCH_BINARY_ZIP (s s – c), unpack message and diff, patch message and
+/// pack result
 pub(super) fn execute_diff_patch_binary_zip_not_quiet(engine: &mut Engine) -> Status {
     execute_patch_with_options("DIFF_PATCH_BINARY_ZIP", engine, ZIP + BINARY)
 }

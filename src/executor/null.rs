@@ -1,25 +1,21 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    executor::{
-        engine::{storage::fetch_stack, Engine},
-        types::Instruction,
-        Mask,
-    },
-    stack::{integer::IntegerData, StackItem},
-    types::Status,
-};
+use crate::executor::engine::storage::fetch_stack;
+use crate::executor::engine::Engine;
+use crate::executor::types::Instruction;
+use crate::executor::Mask;
+use crate::stack::integer::IntegerData;
+use crate::stack::StackItem;
+use crate::types::Status;
 
 pub(super) fn execute_null(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("NULL"))?;
@@ -45,11 +41,7 @@ fn nullzeroswapif(engine: &mut Engine, name: &'static str, how: u8) -> Status {
     debug_assert!(args == 1 || args == 2);
     engine.load_instruction(Instruction::new(name))?;
     fetch_stack(engine, args as usize)?;
-    let new_element = if how.bit(ZERO) {
-        int!(0)
-    } else {
-        StackItem::None
-    };
+    let new_element = if how.bit(ZERO) { int!(0) } else { StackItem::None };
     if engine.cmd.var(0).as_bool()? ^ how.bit(INV) {
         if how.bit(DBL) {
             engine.cc.stack.push(new_element.clone());

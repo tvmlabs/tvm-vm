@@ -1,30 +1,34 @@
-/*
-* Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
-
-use crate::{
-    error::TvmError,
-    stack::integer::{
-        behavior::{OperationBehavior, Quiet, Signaling},
-        serialization::Encoding,
-    },
-    types::{Exception, ResultOpt},
-};
-use tvm_types::{error, BuilderData, ExceptionCode, Result, SliceData};
+// Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
 use core::mem;
-use num_traits::{One, Signed, Zero};
 use std::cmp;
 use std::cmp::Ordering;
+
+use num_traits::One;
+use num_traits::Signed;
+use num_traits::Zero;
+use tvm_types::error;
+use tvm_types::BuilderData;
+use tvm_types::ExceptionCode;
+use tvm_types::Result;
+use tvm_types::SliceData;
+
+use crate::error::TvmError;
+use crate::stack::integer::behavior::OperationBehavior;
+use crate::stack::integer::behavior::Quiet;
+use crate::stack::integer::behavior::Signaling;
+use crate::stack::integer::serialization::Encoding;
+use crate::types::Exception;
+use crate::types::ResultOpt;
 
 #[macro_use]
 pub mod behavior;
@@ -59,7 +63,8 @@ impl Default for IntegerData {
 }
 
 impl IntegerData {
-    /// Constructs new (set to 0) value. This is just a wrapper for Self::zero().
+    /// Constructs new (set to 0) value. This is just a wrapper for
+    /// Self::zero().
     #[inline]
     pub fn new() -> IntegerData {
         Self::zero()
@@ -68,17 +73,13 @@ impl IntegerData {
     /// Constructs new (set to 0) value.
     #[inline]
     pub fn zero() -> IntegerData {
-        IntegerData {
-            value: IntegerValue::Value(Int::zero()),
-        }
+        IntegerData { value: IntegerValue::Value(Int::zero()) }
     }
 
     /// Constructs new (set to 1) value.
     #[inline]
     pub fn one() -> IntegerData {
-        IntegerData {
-            value: IntegerValue::Value(Int::one()),
-        }
+        IntegerData { value: IntegerValue::Value(Int::one()) }
     }
 
     /// Constructs new (set to -1) value.
@@ -95,19 +96,13 @@ impl IntegerData {
     /// Constructs new Not-a-Number (NaN) value.
     #[inline]
     pub fn nan() -> IntegerData {
-        IntegerData {
-            value: IntegerValue::NaN,
-        }
+        IntegerData { value: IntegerValue::NaN }
     }
 
     /// Constructs mask for bits
     /// it must be refactored to simplify
     pub fn mask(bits: usize) -> Self {
-        IntegerData::one()
-            .shl::<Quiet>(bits)
-            .unwrap()
-            .sub::<Quiet>(&IntegerData::one())
-            .unwrap()
+        IntegerData::one().shl::<Quiet>(bits).unwrap().sub::<Quiet>(&IntegerData::one()).unwrap()
     }
 
     /// Clears value (sets to 0).
@@ -178,13 +173,15 @@ impl IntegerData {
         }
     }
 
-    /// Returns true if signed value fits into a given bits size; otherwise false.
+    /// Returns true if signed value fits into a given bits size; otherwise
+    /// false.
     #[inline]
     pub fn fits_in(&self, bits: usize) -> Result<bool> {
         Ok(self.bitsize()? <= bits)
     }
 
-    /// Returns true if unsigned value fits into a given bits size; otherwise false.
+    /// Returns true if unsigned value fits into a given bits size; otherwise
+    /// false.
     #[inline]
     pub fn ufits_in(&self, bits: usize) -> Result<bool> {
         Ok(!self.is_neg() && self.ubitsize()? <= bits)
@@ -215,6 +212,7 @@ impl IntegerData {
         }
         T::new(bits).try_serialize(self)
     }
+
     pub fn as_unsigned_bytes_be(&self) -> Result<Vec<u8>> {
         unimplemented!()
     }
@@ -229,8 +227,9 @@ impl AsRef<IntegerData> for IntegerData {
 
 #[macro_use]
 pub mod utils {
-    use super::*;
     use std::ops::Not;
+
+    use super::*;
 
     #[inline]
     pub fn process_value<F, R>(value: &IntegerData, call_on_valid: F) -> Result<R>
@@ -245,10 +244,10 @@ pub mod utils {
         }
     }
 
-    /// This macro extracts internal Int value from IntegerData using given NaN behavior
-    /// and NaN constructor.
+    /// This macro extracts internal Int value from IntegerData using given NaN
+    /// behavior and NaN constructor.
     macro_rules! extract_value {
-        ($T: ident, $v: ident, $nan_constructor: ident) => {
+        ($T:ident, $v:ident, $nan_constructor:ident) => {
             match $v.value {
                 IntegerValue::NaN => {
                     on_nan_parameter!($T)?;
@@ -259,7 +258,8 @@ pub mod utils {
         };
     }
 
-    /// Unary operation. Checks lhs for NaN, unwraps it, calls closure and returns wrapped result.
+    /// Unary operation. Checks lhs for NaN, unwraps it, calls closure and
+    /// returns wrapped result.
     #[inline]
     pub fn unary_op<T, F, FNaN, FRes, RInt, R>(
         lhs: &IntegerData,
@@ -278,7 +278,8 @@ pub mod utils {
         result_processor(callback(lhs), nan_constructor)
     }
 
-    /// Binary operation. Checks lhs & rhs for NaN, unwraps them, calls closure and returns wrapped result.
+    /// Binary operation. Checks lhs & rhs for NaN, unwraps them, calls closure
+    /// and returns wrapped result.
     #[inline]
     pub fn binary_op<T, F, FNaN, FRes, RInt, R>(
         lhs: &IntegerData,
@@ -340,7 +341,8 @@ pub mod utils {
         (construct_single_nan(), construct_single_nan())
     }
 
-    /// Integer overflow checking. Returns true, if value fits into IntegerData; otherwise false.
+    /// Integer overflow checking. Returns true, if value fits into IntegerData;
+    /// otherwise false.
     #[inline]
     pub fn check_overflow(value: &Int) -> bool {
         bitsize(value) < 258
@@ -357,7 +359,8 @@ pub mod utils {
         if value.is_positive() {
             return res + 1;
         }
-        // For negative values value.bits() returns correct result only when value is power of 2.
+        // For negative values value.bits() returns correct result only when value is
+        // power of 2.
         let mut modpow2 = value.abs();
         modpow2 &= &modpow2 - 1;
         if modpow2.is_zero() {

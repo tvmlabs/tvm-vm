@@ -1,22 +1,24 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    executor::math::DivMode,
-    stack::{integer::IntegerData, StackItem},
-};
-use std::{fmt, ops::Range};
-use tvm_types::{error, Result, SliceData};
+use std::fmt;
+use std::ops::Range;
+
+use tvm_types::error;
+use tvm_types::Result;
+use tvm_types::SliceData;
+
+use crate::executor::math::DivMode;
+use crate::stack::integer::IntegerData;
+use crate::stack::StackItem;
 
 macro_rules! param {
     ($self:ident, $id:ident) => {{
@@ -134,16 +136,14 @@ pub(super) struct Instruction {
 
 impl Instruction {
     pub(super) fn new(name: &'static str) -> Self {
-        Self {
-            name,
-            name_prefix: None,
-            opts: None,
-        }
+        Self { name, name_prefix: None, opts: None }
     }
+
     pub(super) fn set_name_prefix(mut self, prefix: Option<&'static str>) -> Self {
         self.name_prefix = prefix;
         self
     }
+
     pub(super) fn set_opts(mut self, opts: InstructionOptions) -> Self {
         self.opts = Some(opts);
         self
@@ -161,15 +161,12 @@ pub(super) struct InstructionExt {
 impl InstructionExt {
     pub(super) fn new(name: &'static str) -> Self {
         Self {
-            proto: Instruction {
-                name,
-                name_prefix: None,
-                opts: None,
-            },
+            proto: Instruction { name, name_prefix: None, opts: None },
             params: Vec::new(),
             vars: Vec::new(),
         }
     }
+
     fn name(&self) -> String {
         match self.proto.name_prefix {
             Some(prefix) => prefix.to_string() + self.proto.name,
@@ -180,45 +177,59 @@ impl InstructionExt {
     pub(super) fn creg_raw(&self) -> Option<usize> {
         param!(self, ControlRegister)
     }
+
     pub(super) fn division_mode_raw(&self) -> Option<&DivMode> {
         param_ref!(self, DivisionMode)
     }
+
     pub(super) fn integer_raw(&self) -> Option<isize> {
         param!(self, Integer)
     }
+
     pub(super) fn biginteger_raw(&self) -> Option<&IntegerData> {
         param_ref!(self, BigInteger)
     }
+
     pub(super) fn biginteger_mut_raw(&mut self) -> Option<&mut IntegerData> {
         param_ref_mut!(self, BigInteger)
     }
+
     pub(super) fn length_raw(&self) -> Option<usize> {
         param!(self, Length)
     }
+
     pub(super) fn nargs_raw(&self) -> Option<isize> {
         param!(self, Nargs)
     }
+
     pub(super) fn pargs_raw(&self) -> Option<usize> {
         param!(self, Pargs)
     }
+
     pub(super) fn rargs_raw(&self) -> Option<usize> {
         param!(self, Rargs)
     }
+
     pub(super) fn slice_raw(&self) -> Option<&SliceData> {
         param_ref!(self, Slice)
     }
+
     pub(super) fn sreg_raw(&self) -> Option<usize> {
         param!(self, StackRegister)
     }
+
     pub(super) fn sregs_raw(&self) -> Option<&RegisterPair> {
         param_ref!(self, StackRegisterPair)
     }
+
     pub(super) fn sregs3_raw(&self) -> Option<&RegisterTrio> {
         param_ref!(self, StackRegisterTrio)
     }
+
     pub(super) fn length_and_index_raw(&self) -> Option<&LengthAndIndex> {
         param_ref!(self, LengthAndIndex)
     }
+
     pub(super) fn clear(&mut self) {
         self.params.clear()
     }
@@ -226,67 +237,83 @@ impl InstructionExt {
     pub(super) fn creg(&self) -> usize {
         self.creg_raw().unwrap()
     }
+
     pub(super) fn biginteger_mut(&mut self) -> &mut IntegerData {
         self.biginteger_mut_raw().unwrap()
     }
+
     pub(super) fn division_mode(&self) -> &DivMode {
         self.division_mode_raw().unwrap()
     }
+
     pub(super) fn has_length(&self) -> bool {
         self.length_raw().is_some()
     }
+
     pub(super) fn integer(&self) -> isize {
         self.integer_raw().unwrap()
     }
+
     pub(super) fn length(&self) -> usize {
         self.length_raw().unwrap()
     }
+
     pub(super) fn nargs(&self) -> isize {
         self.nargs_raw().unwrap_or(-1)
     }
+
     pub(super) fn pargs(&self) -> usize {
         self.pargs_raw().unwrap_or(0)
     }
+
     pub(super) fn push_var(&mut self, var: StackItem) {
         self.vars.push(var)
     }
+
     pub(super) fn rargs(&self) -> usize {
         self.rargs_raw().unwrap_or(0)
     }
+
     pub(super) fn slice(&self) -> &SliceData {
         self.slice_raw().unwrap()
     }
+
     pub(super) fn sreg(&self) -> usize {
         self.sreg_raw().unwrap()
     }
+
     pub(super) fn sregs(&self) -> &RegisterPair {
         self.sregs_raw().unwrap()
     }
+
     pub(super) fn sregs3(&self) -> &RegisterTrio {
         self.sregs3_raw().unwrap()
     }
+
     pub(super) fn length_and_index(&self) -> &LengthAndIndex {
         self.length_and_index_raw().unwrap()
     }
+
     pub(super) fn var(&self, index: usize) -> &StackItem {
         self.vars.get(index).unwrap()
     }
+
     pub(super) fn var_count(&self) -> usize {
         self.vars.len()
     }
+
     pub(super) fn var_mut(&mut self, index: usize) -> &mut StackItem {
         self.vars.get_mut(index).unwrap()
     }
+
     pub(super) fn last_var(&self) -> Result<&StackItem> {
-        self.vars
-            .last()
-            .ok_or_else(|| error!("no vars for {}", self.name()))
+        self.vars.last().ok_or_else(|| error!("no vars for {}", self.name()))
     }
+
     pub(super) fn pop_var(&mut self) -> Result<StackItem> {
-        self.vars
-            .pop()
-            .ok_or_else(|| error!("no vars for {}", self.name()))
+        self.vars.pop().ok_or_else(|| error!("no vars for {}", self.name()))
     }
+
     pub(super) fn dump_with_params(&self) -> Option<String> {
         let mut trace = String::new();
         if let Some(prefix) = self.proto.name_prefix {
@@ -300,15 +327,11 @@ impl InstructionExt {
             Some(InstructionOptions::ArgumentConstraints) => {
                 format!(" {}, {}", self.pargs_raw()?, self.nargs_raw()?)
             }
-            Some(InstructionOptions::BigInteger) => format!(" {}", self.biginteger_raw()?), // TODO: it is zero because execution withdraws it
+            Some(InstructionOptions::BigInteger) => format!(" {}", self.biginteger_raw()?), /* TODO: it is zero because execution withdraws it */
             Some(InstructionOptions::ControlRegister) => format!(" c{}", self.creg_raw()?),
             Some(InstructionOptions::DivisionMode) => {
                 let mode = self.division_mode();
-                if mode.shift_parameter() {
-                    format!(" {}", self.length())
-                } else {
-                    String::new()
-                }
+                if mode.shift_parameter() { format!(" {}", self.length()) } else { String::new() }
             }
             Some(InstructionOptions::Integer(_)) => format!(" {}", self.integer_raw()?),
             Some(InstructionOptions::Length(_)) | Some(InstructionOptions::LengthMinusOne(_)) => {
@@ -325,11 +348,7 @@ impl InstructionExt {
             Some(InstructionOptions::StackRegister(_)) => format!(" s{}", self.sreg_raw()?),
             Some(InstructionOptions::StackRegisterPair(
                 WhereToGetParams::GetFromNextByteMinusOne,
-            )) => format!(
-                " s{},s{}",
-                self.sregs_raw()?.ra,
-                self.sregs_raw()?.rb as isize - 1
-            ),
+            )) => format!(" s{},s{}", self.sregs_raw()?.ra, self.sregs_raw()?.rb as isize - 1),
             Some(InstructionOptions::StackRegisterPair(_)) => {
                 format!(" s{},s{}", self.sregs_raw()?.ra, self.sregs_raw()?.rb)
             }

@@ -1,44 +1,47 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    error::TvmError,
-    executor::{
-        continuation::callx,
-        engine::{
-            storage::{copy_to_var, fetch_stack, swap},
-            Engine,
-        },
-        microcode::{CC, CTRL, SAVELIST, VAR},
-        types::{Instruction, InstructionOptions},
-    },
-    stack::{
-        continuation::{ContinuationData, ContinuationType},
-        integer::IntegerData,
-        StackItem,
-    },
-    types::{Exception, Status},
-};
 use std::ops::Range;
-use tvm_block::GlobalCapabilities;
-use tvm_types::{error, fail, types::ExceptionCode};
 
-//Utilities **********************************************************************************
+use tvm_block::GlobalCapabilities;
+use tvm_types::error;
+use tvm_types::fail;
+use tvm_types::types::ExceptionCode;
+
+use crate::error::TvmError;
+use crate::executor::continuation::callx;
+use crate::executor::engine::storage::copy_to_var;
+use crate::executor::engine::storage::fetch_stack;
+use crate::executor::engine::storage::swap;
+use crate::executor::engine::Engine;
+use crate::executor::microcode::CC;
+use crate::executor::microcode::CTRL;
+use crate::executor::microcode::SAVELIST;
+use crate::executor::microcode::VAR;
+use crate::executor::types::Instruction;
+use crate::executor::types::InstructionOptions;
+use crate::stack::continuation::ContinuationData;
+use crate::stack::continuation::ContinuationType;
+use crate::stack::integer::IntegerData;
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::Status;
+
+// Utilities *******************************************************************
+// ***************
 //(c c' -)
-//c'.nargs = c'.stack.depth + 2
-//c'.savelist[2] = c2, cc.savelist[2] = c2
-//c'.savelist[0] = cc, c.savelist[0] = cc
-//callx c
+// c'.nargs = c'.stack.depth + 2
+// c'.savelist[2] = c2, cc.savelist[2] = c2
+// c'.savelist[0] = cc, c.savelist[0] = cc
+// callx c
 fn init_try_catch(engine: &mut Engine, keep: bool) -> Status {
     fetch_stack(engine, 2)?;
     if engine.cc.stack.depth() < engine.cmd.pargs() {
@@ -47,28 +50,21 @@ fn init_try_catch(engine: &mut Engine, keep: bool) -> Status {
     let depth: u32 = engine.cc.stack.depth().try_into()?;
     engine.cmd.var(1).as_continuation()?;
     let bugfix = engine.check_capabilities(GlobalCapabilities::CapsTvmBugfixes2022 as u64);
-    engine
-        .cmd
-        .var_mut(0)
-        .as_continuation_mut()
-        .map(|catch_cont| {
-            catch_cont.type_of = ContinuationType::TryCatch;
-            if !bugfix {
-                catch_cont.nargs = catch_cont.stack.depth() as isize + 2
-            }
-        })?;
-    engine
-        .cmd
-        .var_mut(1)
-        .as_continuation_mut()
-        .map(|try_cont| try_cont.remove_from_savelist(0))?;
+    engine.cmd.var_mut(0).as_continuation_mut().map(|catch_cont| {
+        catch_cont.type_of = ContinuationType::TryCatch;
+        if !bugfix {
+            catch_cont.nargs = catch_cont.stack.depth() as isize + 2
+        }
+    })?;
+    engine.cmd.var_mut(1).as_continuation_mut().map(|try_cont| try_cont.remove_from_savelist(0))?;
     if engine.ctrl(2).is_ok() {
         copy_to_var(engine, ctrl!(2))?;
         swap(engine, savelist!(var!(0), 2), var!(2))?;
         copy_to_var(engine, ctrl!(2))?;
         swap(engine, savelist!(CC, 2), var!(3))?;
     }
-    // special swapping for callx: it calls a cont from var0, but at this point var0 holds catch cont
+    // special swapping for callx: it calls a cont from var0, but at this point var0
+    // holds catch cont
     swap(engine, var!(0), var!(1))?;
     swap(engine, ctrl!(2), var!(1))?;
     callx(engine, 0, false)?;
@@ -90,24 +86,18 @@ fn do_throw(engine: &mut Engine, number_index: isize, value_index: isize) -> Sta
     let number = if number_index < 0 {
         engine.cmd.integer() as usize
     } else {
-        engine
-            .cmd
-            .var(number_index as usize)
-            .as_integer()?
-            .into(0..=0xFFFF)?
+        engine.cmd.var(number_index as usize).as_integer()?.into(0..=0xFFFF)?
     };
-    let value = if value_index < 0 {
-        int!(0)
-    } else {
-        engine.cmd.var(value_index as usize).clone()
-    };
+    let value =
+        if value_index < 0 { int!(0) } else { engine.cmd.var(value_index as usize).clone() };
     fail!(TvmError::TvmExceptionFull(
         Exception::from_number_and_value(number, value, file!(), line!()),
         String::new()
     ))
 }
 
-//Handlers ***********************************************************************************
+// Handlers ********************************************************************
+// ***************
 
 fn execute_throw(engine: &mut Engine, range: Range<isize>) -> Status {
     engine
@@ -132,19 +122,11 @@ fn execute_throwif_throwifnot(
     range: Range<isize>,
 ) -> Status {
     engine.load_instruction(
-        Instruction::new(if reverse_condition {
-            "THROWIFNOT"
-        } else {
-            "THROWIF"
-        })
-        .set_opts(InstructionOptions::Integer(range)),
+        Instruction::new(if reverse_condition { "THROWIFNOT" } else { "THROWIF" })
+            .set_opts(InstructionOptions::Integer(range)),
     )?;
     fetch_stack(engine, 1)?;
-    if reverse_condition ^ engine.cmd.var(0).as_bool()? {
-        do_throw(engine, -1, -1)
-    } else {
-        Ok(())
-    }
+    if reverse_condition ^ engine.cmd.var(0).as_bool()? { do_throw(engine, -1, -1) } else { Ok(()) }
 }
 
 pub(super) fn execute_throwif_short(engine: &mut Engine) -> Status {
@@ -171,11 +153,7 @@ fn execute_throwanyif_throwanyifnot(engine: &mut Engine, reverse_condition: bool
         "THROWANYIF"
     }))?;
     fetch_stack(engine, 2)?;
-    if reverse_condition ^ engine.cmd.var(0).as_bool()? {
-        do_throw(engine, 1, -1)
-    } else {
-        Ok(())
-    }
+    if reverse_condition ^ engine.cmd.var(0).as_bool()? { do_throw(engine, 1, -1) } else { Ok(()) }
 }
 
 // (n f, f!=0 => throw 0 n)
@@ -219,11 +197,7 @@ fn execute_throwarganyif_throwarganyifnot(engine: &mut Engine, reverse_condition
         "THROWARGANYIF"
     }))?;
     fetch_stack(engine, 3)?;
-    if reverse_condition ^ engine.cmd.var(0).as_bool()? {
-        do_throw(engine, 1, 2)
-    } else {
-        Ok(())
-    }
+    if reverse_condition ^ engine.cmd.var(0).as_bool()? { do_throw(engine, 1, 2) } else { Ok(()) }
 }
 
 // (x n f, f!=0 => throw x n)
@@ -239,19 +213,11 @@ pub(super) fn execute_throwarganyifnot(engine: &mut Engine) -> Status {
 // helper for THROWARGIF[NOT] instructions
 fn execute_throwargif_throwargifnot(engine: &mut Engine, reverse_condition: bool) -> Status {
     engine.load_instruction(
-        Instruction::new(if reverse_condition {
-            "THROWARGIFNOT"
-        } else {
-            "THROWARGIF"
-        })
-        .set_opts(InstructionOptions::Integer(0..2048)),
+        Instruction::new(if reverse_condition { "THROWARGIFNOT" } else { "THROWARGIF" })
+            .set_opts(InstructionOptions::Integer(0..2048)),
     )?;
     fetch_stack(engine, 2)?;
-    if reverse_condition ^ engine.cmd.var(0).as_bool()? {
-        do_throw(engine, -1, 1)
-    } else {
-        Ok(())
-    }
+    if reverse_condition ^ engine.cmd.var(0).as_bool()? { do_throw(engine, -1, 1) } else { Ok(()) }
 }
 
 // (x f, f!=0 => throw x n)
@@ -271,7 +237,8 @@ pub(super) fn execute_try(engine: &mut Engine) -> Status {
 }
 
 // (c c' - )
-//move 0<=p<=15 stack elements from cc to c, return 0<=r<=15 stack values of resulting stack of c or c'.
+// move 0<=p<=15 stack elements from cc to c, return 0<=r<=15 stack values of
+// resulting stack of c or c'.
 pub(super) fn execute_tryargs(engine: &mut Engine) -> Status {
     engine.load_instruction(
         Instruction::new("TRYARGS").set_opts(InstructionOptions::ArgumentAndReturnConstraints),

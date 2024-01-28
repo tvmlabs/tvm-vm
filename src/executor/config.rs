@@ -1,34 +1,28 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    executor::{
-        engine::{storage::fetch_stack, Engine},
-        types::{Instruction, InstructionOptions},
-    },
-    stack::{integer::IntegerData, StackItem},
-    types::Status,
-};
 use tvm_block::GlobalCapabilities;
+
+use crate::executor::engine::storage::fetch_stack;
+use crate::executor::engine::Engine;
+use crate::executor::types::Instruction;
+use crate::executor::types::InstructionOptions;
+use crate::stack::integer::IntegerData;
+use crate::stack::StackItem;
+use crate::types::Status;
 
 fn execute_config_param(engine: &mut Engine, name: &'static str, opt: bool) -> Status {
     engine.load_instruction(Instruction::new(name))?;
     fetch_stack(engine, 1)?;
-    let index: i32 = engine
-        .cmd
-        .var(0)
-        .as_integer()?
-        .into(std::i32::MIN..=std::i32::MAX)?;
+    let index: i32 = engine.cmd.var(0).as_integer()?.into(std::i32::MIN..=std::i32::MAX)?;
     if let Some(value) = engine.get_config_param(index)? {
         engine.cc.stack.push(StackItem::Cell(value));
         if !opt {

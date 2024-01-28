@@ -1,15 +1,13 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
 use super::*;
 
@@ -20,10 +18,7 @@ fn test_smart_contract_info_serialization_default() {
 }
 
 fn check_additional_fields(capabilities: u64, count: usize) {
-    let sci = SmartContractInfo {
-        capabilities,
-        ..Default::default()
-    };
+    let sci = SmartContractInfo { capabilities, ..Default::default() };
     let item = sci.into_temp_data_item();
     let result = item
         .as_tuple()
@@ -33,11 +28,7 @@ fn check_additional_fields(capabilities: u64, count: usize) {
         .as_tuple()
         .expect("SMCI list must be a tuple")
         .len();
-    assert_eq!(
-        result, count,
-        "wrong total count for capabilities {:X}",
-        capabilities
-    );
+    assert_eq!(result, count, "wrong total count for capabilities {:X}", capabilities);
 }
 
 #[test]

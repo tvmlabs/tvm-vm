@@ -1,29 +1,31 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    error::TvmError,
-    executor::{
-        engine::{storage::fetch_stack, Engine},
-        gas::gas_state::Gas,
-        types::{Instruction, InstructionOptions, WhereToGetParams},
-        Mask,
-    },
-    stack::{integer::IntegerData, StackItem},
-    types::{Exception, Status},
-};
 use tvm_block::GlobalCapabilities;
-use tvm_types::{error, fail, ExceptionCode};
+use tvm_types::error;
+use tvm_types::fail;
+use tvm_types::ExceptionCode;
+
+use crate::error::TvmError;
+use crate::executor::engine::storage::fetch_stack;
+use crate::executor::engine::Engine;
+use crate::executor::gas::gas_state::Gas;
+use crate::executor::types::Instruction;
+use crate::executor::types::InstructionOptions;
+use crate::executor::types::WhereToGetParams;
+use crate::executor::Mask;
+use crate::stack::integer::IntegerData;
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::Status;
 
 fn tuple(engine: &mut Engine, name: &'static str, how: u8) -> Status {
     let mut inst = Instruction::new(name);
@@ -71,11 +73,7 @@ fn tuple_index(engine: &mut Engine, how: u8) -> Status {
         _ => fail!("unreachabe tuple_index"),
     })?;
     fetch_stack(engine, params)?;
-    let n = if index == 0 {
-        engine.cmd.var(0).as_integer()?.into(0..=254)?
-    } else {
-        0
-    };
+    let n = if index == 0 { engine.cmd.var(0).as_integer()?.into(0..=254)? } else { 0 };
     if engine.cmd.var(params - 1).is_null() && how.bit(QUIET) {
         engine.cc.stack.push(StackItem::None);
         return Ok(());
@@ -272,12 +270,7 @@ fn set_index_v2(engine: &mut Engine, name: &'static str, how: u8) -> Status {
             engine.use_gas(Gas::tuple_gas_price(n + 1));
         }
     } else {
-        return err!(
-            ExceptionCode::RangeCheckError,
-            "set_index failed {} >= {}",
-            n,
-            len
-        );
+        return err!(ExceptionCode::RangeCheckError, "set_index failed {} >= {}", n, len);
     }
     engine.cc.stack.push_tuple(tuple);
     Ok(())
@@ -316,12 +309,7 @@ fn set_index_v1(engine: &mut Engine, name: &'static str, how: u8) -> Status {
         tuple.append(&mut vec![StackItem::None; n - len]);
         tuple.push(var);
     } else {
-        return err!(
-            ExceptionCode::RangeCheckError,
-            "set_index failed {} >= {}",
-            n,
-            len
-        );
+        return err!(ExceptionCode::RangeCheckError, "set_index failed {} >= {}", n, len);
     }
     if !value_is_null {
         engine.use_gas(Gas::tuple_gas_price(tuple.len()));

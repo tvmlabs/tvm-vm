@@ -1,31 +1,29 @@
-/*
-* Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::executor::accounts::{
-    SimpleAddress, SortedList, StakeAndFactor, Validator, ValidatorKey,
-};
 use num::BigUint;
-use rand::{prelude::SliceRandom, thread_rng};
+use rand::prelude::SliceRandom;
+use rand::thread_rng;
 use tvm_block::Grams;
 use tvm_types::UInt256;
 
+use crate::executor::accounts::SimpleAddress;
+use crate::executor::accounts::SortedList;
+use crate::executor::accounts::StakeAndFactor;
+use crate::executor::accounts::Validator;
+use crate::executor::accounts::ValidatorKey;
+
 impl Validator {
     fn with_stake(stake: u64) -> Validator {
-        let key = ValidatorKey {
-            stake: Grams::from(stake),
-            time: 0,
-            pub_key: UInt256::ZERO,
-        };
+        let key = ValidatorKey { stake: Grams::from(stake), time: 0, pub_key: UInt256::ZERO };
         Validator {
             key,
             true_stake: 0,
@@ -35,6 +33,7 @@ impl Validator {
             mc_seq_no_since: 0,
         }
     }
+
     fn with_params(stake: u64, time: u32, pub_key: [u8; 32]) -> Validator {
         let key = ValidatorKey {
             stake: Grams::from(stake),
@@ -79,10 +78,7 @@ fn test_sorted_list() {
         (7, Validator::with_stake(3)),
     ];
     for (stake, validator) in &items {
-        list.insert(StakeAndFactor {
-            stake: BigUint::from(*stake),
-            validator,
-        });
+        list.insert(StakeAndFactor { stake: BigUint::from(*stake), validator });
     }
     for item in &list.list {
         println!("{}: {}", item.stake, item.validator.key.stake);

@@ -1,30 +1,41 @@
-/*
-* Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use super::{
-    items_deserialize, items_serialize, prepare_cont_serialize_vars, slice_deserialize,
-    slice_serialize, DeserializeItem,
-};
-use crate::{
-    error::TvmError,
-    executor::gas::gas_state::Gas,
-    stack::{savelist::SaveList, SliceData, Stack, StackItem},
-    types::{Exception, ResultOpt},
-};
-use std::{fmt, mem};
-use tvm_types::{
-    error, BuilderData, Cell, ExceptionCode, GasConsumer, HashmapE, HashmapType, IBitstring, Result,
-};
+use std::fmt;
+use std::mem;
+
+use tvm_types::error;
+use tvm_types::BuilderData;
+use tvm_types::Cell;
+use tvm_types::ExceptionCode;
+use tvm_types::GasConsumer;
+use tvm_types::HashmapE;
+use tvm_types::HashmapType;
+use tvm_types::IBitstring;
+use tvm_types::Result;
+
+use super::items_deserialize;
+use super::items_serialize;
+use super::prepare_cont_serialize_vars;
+use super::slice_deserialize;
+use super::slice_serialize;
+use super::DeserializeItem;
+use crate::error::TvmError;
+use crate::executor::gas::gas_state::Gas;
+use crate::stack::savelist::SaveList;
+use crate::stack::SliceData;
+use crate::stack::Stack;
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::ResultOpt;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ContinuationType {
@@ -138,9 +149,7 @@ impl ContinuationData {
     }
 
     pub fn drain_reference(&mut self) -> Result<Cell> {
-        self.code
-            .checked_drain_reference()
-            .map_err(|_| exception!(ExceptionCode::InvalidOpcode))
+        self.code.checked_drain_reference().map_err(|_| exception!(ExceptionCode::InvalidOpcode))
     }
 
     pub(crate) fn serialize(&self, gas_consumer: &mut dyn GasConsumer) -> Result<BuilderData> {
@@ -226,9 +235,7 @@ impl ContinuationData {
         let mut list = Vec::new();
         ContinuationData::deserialize_internal(&mut list, slice, gas_consumer)?;
         Ok(std::mem::replace(
-            items_deserialize(list, gas_consumer)?
-                .remove(0)
-                .as_continuation_mut()?,
+            items_deserialize(list, gas_consumer)?.remove(0).as_continuation_mut()?,
             ContinuationData::new_empty(),
         ))
     }
@@ -251,7 +258,7 @@ impl ContinuationData {
                         ExceptionCode::UnknownError,
                         "wrong continuation type 01{:2b}",
                         typ
-                    )
+                    );
                 }
             },
             2 => match slice.get_next_int(2)? {
@@ -272,7 +279,7 @@ impl ContinuationData {
                         ExceptionCode::UnknownError,
                         "wrong continuation type 10{:2b}",
                         typ
-                    )
+                    );
                 }
             },
             3 => match slice.get_next_int(2)? {
@@ -305,16 +312,10 @@ impl ContinuationData {
                         ExceptionCode::UnknownError,
                         "wrong continuation type 10{:2b}",
                         typ
-                    )
+                    );
                 }
             },
-            typ => {
-                return err!(
-                    ExceptionCode::UnknownError,
-                    "wrong continuation type {:2b}",
-                    typ
-                )
-            }
+            typ => return err!(ExceptionCode::UnknownError, "wrong continuation type {:2b}", typ),
         };
 
         let nargs = match slice.get_next_int(22)? as isize {

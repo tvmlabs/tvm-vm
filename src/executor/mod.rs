@@ -1,15 +1,13 @@
-/*
-* Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
 #[macro_use]
 mod microcode;
@@ -39,7 +37,10 @@ mod tuple;
 mod types;
 
 pub use engine::*;
-use tvm_types::{BuilderData, Cell, IBitstring, Result};
+use tvm_types::BuilderData;
+use tvm_types::Cell;
+use tvm_types::IBitstring;
+use tvm_types::Result;
 
 #[cfg(test)]
 #[path = "../tests/test_executor.rs"]
@@ -55,12 +56,15 @@ impl Mask for u8 {
     fn bit(&self, bits: Self) -> bool {
         (self & bits) == bits
     }
+
     fn mask(&self, mask: Self) -> u8 {
         self & mask
     }
+
     fn any(&self, bits: Self) -> bool {
         (self & bits) != 0
     }
+
     fn non(&self, bits: Self) -> bool {
         (self & bits) == 0
     }

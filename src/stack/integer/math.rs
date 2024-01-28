@@ -1,28 +1,29 @@
-/*
-* Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
 use std::ops::AddAssign;
 
-use crate::stack::integer::{
-    behavior::OperationBehavior,
-    utils::{
-        binary_op, construct_double_nan, construct_single_nan, process_double_result,
-        process_single_result, unary_op,
-    },
-    IntegerData, IntegerValue,
-};
 use num_traits::Zero;
-use tvm_types::{Result, Status};
+use tvm_types::Result;
+use tvm_types::Status;
+
+use crate::stack::integer::behavior::OperationBehavior;
+use crate::stack::integer::utils::binary_op;
+use crate::stack::integer::utils::construct_double_nan;
+use crate::stack::integer::utils::construct_single_nan;
+use crate::stack::integer::utils::process_double_result;
+use crate::stack::integer::utils::process_single_result;
+use crate::stack::integer::utils::unary_op;
+use crate::stack::integer::IntegerData;
+use crate::stack::integer::IntegerValue;
 
 // [x / y] -> (q, r)  :  q*y + r = x  :  |r| < |y|
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -34,7 +35,8 @@ pub enum Round {
 }
 
 impl IntegerData {
-    /// Creates and returns a copy of the same value with a sign changed to an opposite.
+    /// Creates and returns a copy of the same value with a sign changed to an
+    /// opposite.
     pub fn neg<T: OperationBehavior>(&self) -> Result<IntegerData> {
         unary_op::<T, _, _, _, _, _>(
             self,
@@ -171,9 +173,14 @@ impl IntegerData {
 
 pub mod utils {
 
-    use crate::stack::integer::{math::Round, Int};
-    use num_traits::{One, Signed, Zero};
     use std::cmp::Ordering;
+
+    use num_traits::One;
+    use num_traits::Signed;
+    use num_traits::Zero;
+
+    use crate::stack::integer::math::Round;
+    use crate::stack::integer::Int;
 
     #[inline]
     pub fn divmod(dividend: &Int, divisor: &Int, rounding: Round) -> (Int, Int) {

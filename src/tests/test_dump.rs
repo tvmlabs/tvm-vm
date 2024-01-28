@@ -1,38 +1,42 @@
-/*
-* Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    executor::{
-        dump::{
-            dump_var, execute_dump_bin, execute_dump_hex, execute_dump_stack,
-            execute_dump_stack_top, execute_dump_str, execute_dump_string, execute_print_bin,
-            execute_print_hex, execute_print_str, BIN, HEX, STR,
-        },
-        engine::Engine,
-    },
-    stack::{integer::IntegerData, Stack, StackItem},
-};
-use tvm_types::{BuilderData, SliceData};
+use tvm_types::BuilderData;
+use tvm_types::SliceData;
+
+use crate::executor::dump::dump_var;
+use crate::executor::dump::execute_dump_bin;
+use crate::executor::dump::execute_dump_hex;
+use crate::executor::dump::execute_dump_stack;
+use crate::executor::dump::execute_dump_stack_top;
+use crate::executor::dump::execute_dump_str;
+use crate::executor::dump::execute_dump_string;
+use crate::executor::dump::execute_print_bin;
+use crate::executor::dump::execute_print_hex;
+use crate::executor::dump::execute_print_str;
+use crate::executor::dump::BIN;
+use crate::executor::dump::HEX;
+use crate::executor::dump::STR;
+use crate::executor::engine::Engine;
+use crate::stack::integer::IntegerData;
+use crate::stack::Stack;
+use crate::stack::StackItem;
 
 #[test]
 fn test_dump_var() {
-    [0, 15, 23466454, 347387434, 4383434]
-        .iter()
-        .for_each(|value| {
-            assert_eq!(format!("{}", *value), dump_var(&int!(*value), 0));
-            assert_eq!(format!("{:X}", *value), dump_var(&int!(*value), HEX));
-            assert_eq!(format!("{:b}", *value), dump_var(&int!(*value), BIN));
-        });
+    [0, 15, 23466454, 347387434, 4383434].iter().for_each(|value| {
+        assert_eq!(format!("{}", *value), dump_var(&int!(*value), 0));
+        assert_eq!(format!("{:X}", *value), dump_var(&int!(*value), HEX));
+        assert_eq!(format!("{:b}", *value), dump_var(&int!(*value), BIN));
+    });
     [-15, -23466454, -476343874].iter().for_each(|value| {
         assert_eq!(format!("{}", *value), dump_var(&int!(*value), 0));
         assert_eq!(format!("-{:X}", -*value), dump_var(&int!(*value), HEX));

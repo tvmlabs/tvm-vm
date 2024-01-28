@@ -1,25 +1,26 @@
-/*
-* Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    executor::{
-        engine::Engine,
-        microcode::{BUILDER, CELL, CONTINUATION, SLICE, VAR},
-    },
-    stack::{continuation::ContinuationData, StackItem},
-    types::Status,
-};
-use tvm_types::{fail, GasConsumer};
+use tvm_types::fail;
+use tvm_types::GasConsumer;
+
+use crate::executor::engine::Engine;
+use crate::executor::microcode::BUILDER;
+use crate::executor::microcode::CELL;
+use crate::executor::microcode::CONTINUATION;
+use crate::executor::microcode::SLICE;
+use crate::executor::microcode::VAR;
+use crate::stack::continuation::ContinuationData;
+use crate::stack::StackItem;
+use crate::types::Status;
 
 // Utilities ******************************************************************
 
@@ -65,12 +66,7 @@ fn convert_any(engine: &mut Engine, x: u16, to: u16, from: u16) -> Status {
         _ => StackItem::None,
     };
     if data.is_null() {
-        fail!(
-            "cannot convert_any x: {:X}, to: {:X}, from: {:X}",
-            x,
-            to,
-            from
-        )
+        fail!("cannot convert_any x: {:X}, to: {:X}, from: {:X}", x, to, from)
     } else {
         *engine.cmd.var_mut(storage_index!(x)) = data;
     }

@@ -1,15 +1,13 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
 mod test_equal {
 
@@ -83,8 +81,11 @@ mod test_bitsize {
 
 mod test_minus_2_pow_256 {
 
-    use crate::stack::integer::{behavior::Signaling, IntegerData};
-    use tvm_types::{types::ExceptionCode, Result};
+    use tvm_types::types::ExceptionCode;
+    use tvm_types::Result;
+
+    use crate::stack::integer::behavior::Signaling;
+    use crate::stack::integer::IntegerData;
 
     #[test]
     fn test_2_pow_256_overflows() {
@@ -106,9 +107,7 @@ mod test_minus_2_pow_256 {
         assert!(value.is_neg());
         assert_eq!(
             crate::error::tvm_exception_code(
-                &value
-                    .neg::<Signaling>()
-                    .expect_err("Integer overflow is expected")
+                &value.neg::<Signaling>().expect_err("Integer overflow is expected")
             ),
             Some(ExceptionCode::IntegerOverflow)
         );
@@ -147,17 +146,15 @@ mod test_minus_2_pow_256 {
 
 mod test_behavior {
 
-    use crate::stack::integer::{
-        behavior::{Quiet, Signaling},
-        IntegerData,
-    };
+    use crate::stack::integer::behavior::Quiet;
+    use crate::stack::integer::behavior::Signaling;
+    use crate::stack::integer::IntegerData;
 
     #[test]
     fn add_quiet_vs_signaling() {
         let x = IntegerData::nan();
         let y = IntegerData::one();
-        x.add::<Signaling>(&y)
-            .expect_err("Adding a NaN with a number should fail.");
+        x.add::<Signaling>(&y).expect_err("Adding a NaN with a number should fail.");
         assert!(
             x.add::<Quiet>(&y)
                 .expect("Adding a NaN with a number doesn't fail in quiet version.")
@@ -169,33 +166,25 @@ mod test_behavior {
 
 mod test_bitlogics {
 
-    use crate::stack::integer::{behavior::Signaling, IntegerData};
+    use crate::stack::integer::behavior::Signaling;
+    use crate::stack::integer::IntegerData;
 
     fn test_and(x: i64, y: i64) {
         let xdst = IntegerData::from_i64(x);
         let ydst = IntegerData::from_i64(y);
-        assert_eq!(
-            IntegerData::from_i64(x & y),
-            xdst.and::<Signaling>(&ydst).unwrap()
-        );
+        assert_eq!(IntegerData::from_i64(x & y), xdst.and::<Signaling>(&ydst).unwrap());
     }
 
     fn test_or(x: i64, y: i64) {
         let xdst = IntegerData::from_i64(x);
         let ydst = IntegerData::from_i64(y);
-        assert_eq!(
-            IntegerData::from_i64(x | y),
-            xdst.or::<Signaling>(&ydst).unwrap()
-        );
+        assert_eq!(IntegerData::from_i64(x | y), xdst.or::<Signaling>(&ydst).unwrap());
     }
 
     fn test_xor(x: i64, y: i64) {
         let xdst = IntegerData::from_i64(x);
         let ydst = IntegerData::from_i64(y);
-        assert_eq!(
-            IntegerData::from_i64(x ^ y),
-            xdst.xor::<Signaling>(&ydst).unwrap()
-        );
+        assert_eq!(IntegerData::from_i64(x ^ y), xdst.xor::<Signaling>(&ydst).unwrap());
     }
 
     fn test_not(x: i64) {
@@ -205,18 +194,12 @@ mod test_bitlogics {
 
     fn test_shl(x: i64, shift: usize) {
         let xdst = IntegerData::from_i64(x);
-        assert_eq!(
-            IntegerData::from_i64(x << shift as i64),
-            xdst.shl::<Signaling>(shift).unwrap()
-        );
+        assert_eq!(IntegerData::from_i64(x << shift as i64), xdst.shl::<Signaling>(shift).unwrap());
     }
 
     fn test_shr(x: i64, shift: usize) {
         let xdst = IntegerData::from_i64(x);
-        assert_eq!(
-            IntegerData::from_i64(x >> shift as i64),
-            xdst.shr::<Signaling>(shift).unwrap()
-        );
+        assert_eq!(IntegerData::from_i64(x >> shift as i64), xdst.shr::<Signaling>(shift).unwrap());
     }
 
     #[test]

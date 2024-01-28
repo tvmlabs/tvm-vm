@@ -1,30 +1,34 @@
-/*
-* Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::stack::{integer::IntegerData, StackItem};
-use tvm_block::{CurrencyCollection, GlobalCapabilities};
-use tvm_types::{types::UInt256, Cell, HashmapE, HashmapType, Sha256, SliceData};
+use tvm_block::CurrencyCollection;
+use tvm_block::GlobalCapabilities;
+use tvm_types::types::UInt256;
+use tvm_types::Cell;
+use tvm_types::HashmapE;
+use tvm_types::HashmapType;
+use tvm_types::Sha256;
+use tvm_types::SliceData;
 
-/*
-The smart-contract information
-structure SmartContractInfo, passed in the first reference of the cell contained
-in control register c5, is serialized as follows:
+use crate::stack::integer::IntegerData;
+use crate::stack::StackItem;
 
-smc_info#076ef1ea actions:uint16 msgs_sent:uint16
-unixtime:uint32 block_lt:uint64 trans_lt:uint64
-rand_seed:uint256 balance_remaining:CurrencyCollection
-myself:MsgAddress = SmartContractInfo;
-*/
+// The smart-contract information
+// structure SmartContractInfo, passed in the first reference of the cell
+// contained in control register c5, is serialized as follows:
+//
+// smc_info#076ef1ea actions:uint16 msgs_sent:uint16
+// unixtime:uint32 block_lt:uint64 trans_lt:uint64
+// rand_seed:uint256 balance_remaining:CurrencyCollection
+// myself:MsgAddress = SmartContractInfo;
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SmartContractInfo {
     pub actions: u16,
@@ -47,10 +51,7 @@ pub struct SmartContractInfo {
 
 impl SmartContractInfo {
     pub fn with_myself(myself: SliceData) -> Self {
-        Self {
-            myself,
-            ..Self::default()
-        }
+        Self { myself, ..Self::default() }
     }
 
     // for compatibility with old
@@ -111,10 +112,8 @@ impl SmartContractInfo {
         self.mycode = code;
     }
 
-    /*
-            The rand_seed field here is initialized deterministically starting from the
-        rand_seed of the block, and the account address.
-    */
+    // The rand_seed field here is initialized deterministically starting from the
+    // rand_seed of the block, and the account address.
     pub fn calc_rand_seed(&mut self, rand_seed_block: UInt256, account_address_anycast: &[u8]) {
         // combine all parameters to vec and calculate hash of them
         self.rand_seed = if !rand_seed_block.is_zero() {
@@ -125,7 +124,8 @@ impl SmartContractInfo {
             let sha256 = hasher.finalize();
             IntegerData::from_unsigned_bytes_be(sha256)
         } else {
-            // if the user forgot to set the rand_seed_block value, then this 0 will be clearly visible on tests
+            // if the user forgot to set the rand_seed_block value, then this 0 will be
+            // clearly visible on tests
             log::warn!(target: "tvm", "Not set rand_seed_block");
             IntegerData::zero()
         };
@@ -151,10 +151,7 @@ impl SmartContractInfo {
 
     pub fn into_temp_data_item(self) -> StackItem {
         debug_assert_eq!(self.balance_remaining_grams, 0, "use balance instead old");
-        debug_assert!(
-            self.balance_remaining_other.data().is_none(),
-            "use balance instead old"
-        );
+        debug_assert!(self.balance_remaining_other.data().is_none(), "use balance instead old");
 
         let balance = std::cmp::max(self.balance_remaining_grams, self.balance.grams.as_u128());
         let balance_other = self
@@ -179,24 +176,13 @@ impl SmartContractInfo {
             self.config_params.map_or(StackItem::None, StackItem::Cell),
         ];
         let mut additional_params = vec![
-            (
-                GlobalCapabilities::CapMycode,
-                StackItem::cell(self.mycode.clone()),
-            ),
+            (GlobalCapabilities::CapMycode, StackItem::cell(self.mycode.clone())),
             (
                 GlobalCapabilities::CapInitCodeHash,
-                StackItem::int(IntegerData::from_unsigned_bytes_be(
-                    self.init_code_hash.as_slice(),
-                )),
+                StackItem::int(IntegerData::from_unsigned_bytes_be(self.init_code_hash.as_slice())),
             ),
-            (
-                GlobalCapabilities::CapStorageFeeToTvm,
-                StackItem::int(self.storage_fee_collected),
-            ),
-            (
-                GlobalCapabilities::CapDelections,
-                StackItem::int(self.seq_no),
-            ),
+            (GlobalCapabilities::CapStorageFeeToTvm, StackItem::int(self.storage_fee_collected)),
+            (GlobalCapabilities::CapDelections, StackItem::int(self.seq_no)),
         ];
         let add_params = &mut Vec::new();
         for (i, (caps, f)) in additional_params.drain(..).enumerate() {
@@ -208,12 +194,7 @@ impl SmartContractInfo {
             }
         }
         params.append(add_params);
-        debug_assert!(
-            params.len() <= 14,
-            "{:?} caps: {:X}",
-            params,
-            self.capabilities
-        );
+        debug_assert!(params.len() <= 14, "{:?} caps: {:X}", params, self.capabilities);
         StackItem::tuple(vec![StackItem::tuple(params)])
     }
 

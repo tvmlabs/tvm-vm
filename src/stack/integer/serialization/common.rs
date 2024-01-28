@@ -1,15 +1,13 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
 /// Calculates fewest byte count needed to fit a given bit count.
 #[inline]
@@ -25,11 +23,7 @@ pub fn calc_excess_bits(length_in_bits: usize) -> usize {
 
 #[inline]
 fn get_fill(is_negative: bool) -> u8 {
-    if is_negative {
-        0xFF
-    } else {
-        0
-    }
+    if is_negative { 0xFF } else { 0 }
 }
 
 /// Extends buffer, if needed (big-endian).

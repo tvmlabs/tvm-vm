@@ -1,42 +1,40 @@
-/*
-* Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    error::{tvm_exception_code, TvmError},
-    executor::{
-        engine::{storage::fetch_stack, Engine},
-        types::{Instruction, InstructionOptions},
-    },
-    stack::{
-        integer::{
-            behavior::OperationBehavior,
-            math::{
-                utils::{div_by_shift, divmod},
-                Round,
-            },
-            utils::{binary_op, construct_double_nan, process_double_result, unary_op},
-            IntegerData,
-        },
-        StackItem,
-    },
-    types::{Exception, Status},
-};
-use std::{cmp::Ordering, mem};
-use tvm_types::{
-    error,
-    types::{Bitmask, ExceptionCode},
-    Result,
-};
+use std::cmp::Ordering;
+use std::mem;
+
+use tvm_types::error;
+use tvm_types::types::Bitmask;
+use tvm_types::types::ExceptionCode;
+use tvm_types::Result;
+
+use crate::error::tvm_exception_code;
+use crate::error::TvmError;
+use crate::executor::engine::storage::fetch_stack;
+use crate::executor::engine::Engine;
+use crate::executor::types::Instruction;
+use crate::executor::types::InstructionOptions;
+use crate::stack::integer::behavior::OperationBehavior;
+use crate::stack::integer::math::utils::div_by_shift;
+use crate::stack::integer::math::utils::divmod;
+use crate::stack::integer::math::Round;
+use crate::stack::integer::utils::binary_op;
+use crate::stack::integer::utils::construct_double_nan;
+use crate::stack::integer::utils::process_double_result;
+use crate::stack::integer::utils::unary_op;
+use crate::stack::integer::IntegerData;
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::Status;
 
 // Common definitions *********************************************************
 
@@ -187,11 +185,7 @@ where
 
 macro_rules! boolint {
     ($val:expr) => {
-        if $val {
-            IntegerData::minus_one()
-        } else {
-            IntegerData::zero()
-        }
+        if $val { IntegerData::minus_one() } else { IntegerData::zero() }
     };
 }
 
@@ -373,10 +367,7 @@ where
         on_nan_parameter!(T)?;
         engine.cc.stack.push(var);
     } else if var.as_integer()?.is_neg() {
-        engine
-            .cc
-            .stack
-            .push(StackItem::int(var.as_integer()?.neg::<T>()?));
+        engine.cc.stack.push(StackItem::int(var.as_integer()?.neg::<T>()?));
     } else {
         engine.cc.stack.push(var);
     }

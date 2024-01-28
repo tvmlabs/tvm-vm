@@ -1,26 +1,26 @@
-/*
-* Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    executor::{
-        engine::storage::swap,
-        microcode::{CTRL, SAVELIST, VAR},
-        Engine,
-    },
-    stack::{continuation::ContinuationData, StackItem},
-};
 use tvm_block::GlobalCapabilities;
-use tvm_types::{types::ExceptionCode, Cell, SliceData};
+use tvm_types::types::ExceptionCode;
+use tvm_types::Cell;
+use tvm_types::SliceData;
+
+use crate::executor::engine::storage::swap;
+use crate::executor::microcode::CTRL;
+use crate::executor::microcode::SAVELIST;
+use crate::executor::microcode::VAR;
+use crate::executor::Engine;
+use crate::stack::continuation::ContinuationData;
+use crate::stack::StackItem;
 
 #[test]
 fn test_swap_with_any() {
@@ -56,10 +56,10 @@ fn test_swap_with_none() {
         .setup_with_libraries(SliceData::new_empty(), None, None, None, vec![]);
     engine.cmd.push_var(StackItem::Cell(Cell::default()));
     engine.cmd.push_var(StackItem::None);
-    //try to put CELL to c4 - Ok
+    // try to put CELL to c4 - Ok
     swap(&mut engine, var!(0), ctrl!(4)).unwrap();
     assert_ne!(engine.cmd.var(0), &StackItem::None);
-    //try to put NULL to c4 - Type Check Error
+    // try to put NULL to c4 - Type Check Error
     swap(&mut engine, var!(0), ctrl!(4)).unwrap();
     assert_eq!(
         crate::error::tvm_exception_code(&swap(&mut engine, var!(1), ctrl!(4)).unwrap_err()),

@@ -1,27 +1,28 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    error::TvmError,
-    stack::integer::{
-        utils::{check_overflow, twos_complement},
-        Int, IntegerData, IntegerValue,
-    },
-    types::Exception,
-};
-use num_traits::Num;
 use std::ops::RangeInclusive;
-use tvm_types::{error, types::ExceptionCode, Result};
+
+use num_traits::Num;
+use tvm_types::error;
+use tvm_types::types::ExceptionCode;
+use tvm_types::Result;
+
+use crate::error::TvmError;
+use crate::stack::integer::utils::check_overflow;
+use crate::stack::integer::utils::twos_complement;
+use crate::stack::integer::Int;
+use crate::stack::integer::IntegerData;
+use crate::stack::integer::IntegerValue;
+use crate::types::Exception;
 
 impl IntegerData {
     /// Constructs new IntegerData from u32 in a fastest way.
@@ -30,9 +31,7 @@ impl IntegerData {
         if value == 0 {
             return Self::zero();
         }
-        IntegerData {
-            value: IntegerValue::Value(Int::new(num::bigint::Sign::Plus, vec![value])),
-        }
+        IntegerData { value: IntegerValue::Value(Int::new(num::bigint::Sign::Plus, vec![value])) }
     }
 
     /// Constructs new IntegerData from i32 in a fastest way.
@@ -43,11 +42,7 @@ impl IntegerData {
         }
         IntegerData {
             value: IntegerValue::Value(Int::new(
-                if value < 0 {
-                    num::bigint::Sign::Minus
-                } else {
-                    num::bigint::Sign::Plus
-                },
+                if value < 0 { num::bigint::Sign::Minus } else { num::bigint::Sign::Plus },
                 vec![value.unsigned_abs()],
             )),
         }
@@ -56,36 +51,29 @@ impl IntegerData {
     /// Constructs new IntegerData from u64 in a fastest way.
     #[inline]
     pub fn from_u64(value: u64) -> IntegerData {
-        IntegerData {
-            value: IntegerValue::Value(Int::from(value)),
-        }
+        IntegerData { value: IntegerValue::Value(Int::from(value)) }
     }
 
     /// Constructs new IntegerData from i64 in a fastest way.
     #[inline]
     pub fn from_i64(value: i64) -> IntegerData {
-        IntegerData {
-            value: IntegerValue::Value(Int::from(value)),
-        }
+        IntegerData { value: IntegerValue::Value(Int::from(value)) }
     }
 
     /// Constructs new IntegerData from u128 in a fastest way.
     #[inline]
     pub fn from_u128(value: u128) -> IntegerData {
-        IntegerData {
-            value: IntegerValue::Value(Int::from(value)),
-        }
+        IntegerData { value: IntegerValue::Value(Int::from(value)) }
     }
 
     /// Constructs new IntegerData from i128 in a fastest way.
     #[inline]
     pub fn from_i128(value: i128) -> IntegerData {
-        IntegerData {
-            value: IntegerValue::Value(Int::from(value)),
-        }
+        IntegerData { value: IntegerValue::Value(Int::from(value)) }
     }
 
-    /// Constructs new IntegerData value from the given one of another supported type.
+    /// Constructs new IntegerData value from the given one of another supported
+    /// type.
     #[inline]
     pub fn from(value: impl Into<Int>) -> Result<IntegerData> {
         let bigint = value.into();
@@ -102,9 +90,7 @@ impl IntegerData {
     /// without overflow checking.
     #[inline]
     pub fn from_vec_le_unchecked(sign: num::bigint::Sign, digits: Vec<u32>) -> IntegerData {
-        IntegerData {
-            value: IntegerValue::Value(Int::new(sign, digits)),
-        }
+        IntegerData { value: IntegerValue::Value(Int::new(sign, digits)) }
     }
 
     /// Constructs new IntegerData value from the little-endian slice of u32
@@ -115,9 +101,7 @@ impl IntegerData {
         if !check_overflow(&bigint) {
             return err!(ExceptionCode::IntegerOverflow);
         }
-        Ok(IntegerData {
-            value: IntegerValue::Value(bigint),
-        })
+        Ok(IntegerData { value: IntegerValue::Value(bigint) })
     }
 
     /// Parses string literal with given radix and constructs new IntegerData.
@@ -150,7 +134,8 @@ impl IntegerData {
         }
     }
 
-    /// Extracts internal value using conversion function. Returns IntegerOverflow exception on NaN.
+    /// Extracts internal value using conversion function. Returns
+    /// IntegerOverflow exception on NaN.
     #[inline]
     pub fn take_value_of<T>(&self, convert: impl Fn(&Int) -> Option<T>) -> Result<T> {
         match self.value {
@@ -168,17 +153,18 @@ impl IntegerData {
 
 impl std::str::FromStr for IntegerData {
     type Err = failure::Error;
+
     fn from_str(s: &str) -> Result<Self> {
         Self::from_str_radix(s, 10)
     }
 }
 
 impl IntegerData {
-    /// Decodes value from big endian octet string for PUSHINT primitive using the format
-    /// from TVM Spec A.3.1:
-    ///  "82lxxx — PUSHINT xxx, where 5-bit 0 ≤ l ≤ 30 determines the length n = 8l + 19
-    ///  of signed big-endian integer xxx. The total length of this instruction
-    ///  is l + 4 bytes or n + 13 = 8l + 32 bits."
+    /// Decodes value from big endian octet string for PUSHINT primitive using
+    /// the format from TVM Spec A.3.1:
+    ///  "82lxxx — PUSHINT xxx, where 5-bit 0 ≤ l ≤ 30 determines the length n =
+    /// 8l + 19  of signed big-endian integer xxx. The total length of this
+    /// instruction  is l + 4 bytes or n + 13 = 8l + 32 bits."
     pub fn from_big_endian_octet_stream<F>(mut get_next_byte: F) -> Result<IntegerData>
     where
         F: FnMut() -> Result<u8>,

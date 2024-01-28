@@ -1,18 +1,20 @@
-/*
-* Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
+
+use tvm_types::error;
+use tvm_types::fail;
+use tvm_types::ExceptionCode;
+use tvm_types::Result;
 
 use crate::types::Exception;
-use tvm_types::{error, fail, ExceptionCode, Result};
 
 #[derive(Debug, failure::Fail)]
 pub enum TvmError {
@@ -48,9 +50,7 @@ pub fn tvm_exception_code(err: &failure::Error) -> Option<ExceptionCode> {
     match err.downcast_ref::<TvmError>() {
         Some(TvmError::TvmExceptionFull(err, _)) => err.exception_code(),
         Some(_) => None,
-        None => err
-            .downcast_ref::<tvm_types::types::ExceptionCode>()
-            .cloned(),
+        None => err.downcast_ref::<tvm_types::types::ExceptionCode>().cloned(),
     }
 }
 

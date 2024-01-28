@@ -1,38 +1,45 @@
-/*
-* Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    error::TvmError,
-    executor::{
-        engine::{
-            data::convert,
-            storage::{copy_to_var, fetch_reference, fetch_stack, swap},
-            Engine,
-        },
-        microcode::{CC, CELL, CONTINUATION, CTRL, SAVELIST, SLICE, VAR},
-        types::{Instruction, InstructionOptions, WhereToGetParams},
-    },
-    stack::{
-        continuation::ContinuationData,
-        integer::{behavior::Signaling, IntegerData},
-        savelist::SaveList,
-        StackItem,
-    },
-    types::{Exception, Status},
-};
 use std::cmp;
+
 use tvm_block::GlobalCapabilities;
-use tvm_types::{error, fail, types::ExceptionCode};
+use tvm_types::error;
+use tvm_types::fail;
+use tvm_types::types::ExceptionCode;
+
+use crate::error::TvmError;
+use crate::executor::engine::data::convert;
+use crate::executor::engine::storage::copy_to_var;
+use crate::executor::engine::storage::fetch_reference;
+use crate::executor::engine::storage::fetch_stack;
+use crate::executor::engine::storage::swap;
+use crate::executor::engine::Engine;
+use crate::executor::microcode::CC;
+use crate::executor::microcode::CELL;
+use crate::executor::microcode::CONTINUATION;
+use crate::executor::microcode::CTRL;
+use crate::executor::microcode::SAVELIST;
+use crate::executor::microcode::SLICE;
+use crate::executor::microcode::VAR;
+use crate::executor::types::Instruction;
+use crate::executor::types::InstructionOptions;
+use crate::executor::types::WhereToGetParams;
+use crate::stack::continuation::ContinuationData;
+use crate::stack::integer::behavior::Signaling;
+use crate::stack::integer::IntegerData;
+use crate::stack::savelist::SaveList;
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::Status;
 
 // Stack manipulation *********************************************************
 
@@ -259,7 +266,8 @@ pub(super) fn execute_popsave(engine: &mut Engine) -> Status {
 }
 
 // (x ... y ... z ... a - a... y ... z ... z y x)
-// PU2XC s(i), s(j-1), s(k-2), equal to PUSH s(i); SWAP; PUSH s(j); SWAP; XCHG s(k)
+// PU2XC s(i), s(j-1), s(k-2), equal to PUSH s(i); SWAP; PUSH s(j); SWAP; XCHG
+// s(k)
 pub(super) fn execute_pu2xc(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("PU2XC").set_opts(
         InstructionOptions::StackRegisterTrio(WhereToGetParams::GetFromNextByteMinusOneMinusTwo),
@@ -301,9 +309,10 @@ pub(super) fn execute_push(engine: &mut Engine) -> Status {
 
 // (x ... y ... - x ... y ... x y)
 pub(super) fn execute_push2(engine: &mut Engine) -> Status {
-    engine.load_instruction(Instruction::new("PUSH2").set_opts(
-        InstructionOptions::StackRegisterPair(WhereToGetParams::GetFromNextByte),
-    ))?;
+    engine.load_instruction(
+        Instruction::new("PUSH2")
+            .set_opts(InstructionOptions::StackRegisterPair(WhereToGetParams::GetFromNextByte)),
+    )?;
     let ra = engine.cmd.sregs().ra;
     let rb = engine.cmd.sregs().rb;
     if engine.cc.stack.depth() <= cmp::max(ra, rb) {
@@ -317,9 +326,10 @@ pub(super) fn execute_push2(engine: &mut Engine) -> Status {
 
 // (x ... y ... z ...  - x ... y ... z... x y z)
 pub(super) fn execute_push3(engine: &mut Engine) -> Status {
-    engine.load_instruction(Instruction::new("PUSH3").set_opts(
-        InstructionOptions::StackRegisterTrio(WhereToGetParams::GetFromNextByte),
-    ))?;
+    engine.load_instruction(
+        Instruction::new("PUSH3")
+            .set_opts(InstructionOptions::StackRegisterTrio(WhereToGetParams::GetFromNextByte)),
+    )?;
     let ra = engine.cmd.sregs3().ra;
     let rb = engine.cmd.sregs3().rb;
     let rc = engine.cmd.sregs3().rc;
@@ -336,10 +346,7 @@ pub(super) fn execute_push3(engine: &mut Engine) -> Status {
 fn execute_pushcont(engine: &mut Engine, opts: InstructionOptions) -> Status {
     engine.load_instruction(Instruction::new("PUSHCONT").set_opts(opts))?;
     let slice = engine.cmd.slice().clone();
-    engine
-        .cc
-        .stack
-        .push_cont(ContinuationData::with_code(slice));
+    engine.cc.stack.push_cont(ContinuationData::with_code(slice));
     Ok(())
 }
 
@@ -419,9 +426,7 @@ pub(super) fn execute_pushnegpow2(engine: &mut Engine) -> Status {
         Instruction::new("PUSHNEGPOW2").set_opts(InstructionOptions::LengthMinusOne(0..256)),
     )?;
     let power = engine.cmd.length();
-    engine.cc.stack.push(StackItem::int(
-        IntegerData::minus_one().shl::<Signaling>(power)?,
-    ));
+    engine.cc.stack.push(StackItem::int(IntegerData::minus_one().shl::<Signaling>(power)?));
     Ok(())
 }
 
@@ -429,9 +434,7 @@ pub(super) fn execute_pushnegpow2(engine: &mut Engine) -> Status {
 pub(super) fn execute_pushpow2(engine: &mut Engine) -> Status {
     let power = engine.last_cmd();
     engine.load_instruction(Instruction::new("PUSHPOW2"))?;
-    engine.cc.stack.push(StackItem::int(
-        IntegerData::one().shl::<Signaling>(power as usize + 1)?,
-    ));
+    engine.cc.stack.push(StackItem::int(IntegerData::one().shl::<Signaling>(power as usize + 1)?));
     Ok(())
 }
 
@@ -501,9 +504,10 @@ pub(super) fn execute_pushslice_long(engine: &mut Engine) -> Status {
 // (x ... y ... a - a ... y ... y x)
 // PUXC s(i), s(j-1), equivalent to PUSH s(i); SWAP; XCHG s(j)
 pub(super) fn execute_puxc(engine: &mut Engine) -> Status {
-    engine.load_instruction(Instruction::new("PUXC").set_opts(
-        InstructionOptions::StackRegisterPair(WhereToGetParams::GetFromNextByte),
-    ))?;
+    engine.load_instruction(
+        Instruction::new("PUXC")
+            .set_opts(InstructionOptions::StackRegisterPair(WhereToGetParams::GetFromNextByte)),
+    )?;
     let ra = engine.cmd.sregs().ra;
     let rb = engine.cmd.sregs().rb;
     if engine.cc.stack.depth() < cmp::max(ra + 1, rb) {
@@ -516,7 +520,8 @@ pub(super) fn execute_puxc(engine: &mut Engine) -> Status {
 }
 
 // (x ... y ... z ... a b - a ... b ... z ... z y x)
-// PUXC2 s(i), s(j-1), s(k-1): equivalent to PUSH s(i); XCHG s2; XCHG2 s(j), s(k)
+// PUXC2 s(i), s(j-1), s(k-1): equivalent to PUSH s(i); XCHG s2; XCHG2 s(j),
+// s(k)
 pub(super) fn execute_puxc2(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("PUXC2").set_opts(
         InstructionOptions::StackRegisterTrio(WhereToGetParams::GetFromNextByteMinusOneMinusOne),
@@ -535,7 +540,8 @@ pub(super) fn execute_puxc2(engine: &mut Engine) -> Status {
 }
 
 // (x ... y ... z ... a - x ... a ... z ... z y x)
-// PUXCPU s(i), s(j-1), s(k-1): equivalent to PUSH s(i); SWAP; XCHG s(j); PUSH s(k)
+// PUXCPU s(i), s(j-1), s(k-1): equivalent to PUSH s(i); SWAP; XCHG s(j); PUSH
+// s(k)
 pub(super) fn execute_puxcpu(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("PUXCPU").set_opts(
         InstructionOptions::StackRegisterTrio(WhereToGetParams::GetFromNextByteMinusOneMinusOne),
@@ -642,9 +648,10 @@ pub(super) fn execute_tuck(engine: &mut Engine) -> Status {
 // (x ... y ... z ... a b - x ... a ... b ... z y x)
 // XC2PU s(i), s(j), s(k): equivalent to XCHG2 s(i), s(j); PUSH s(k)
 pub(super) fn execute_xc2pu(engine: &mut Engine) -> Status {
-    engine.load_instruction(Instruction::new("XC2PU").set_opts(
-        InstructionOptions::StackRegisterTrio(WhereToGetParams::GetFromNextByte),
-    ))?;
+    engine.load_instruction(
+        Instruction::new("XC2PU")
+            .set_opts(InstructionOptions::StackRegisterTrio(WhereToGetParams::GetFromNextByte)),
+    )?;
     let ra = engine.cmd.sregs3().ra;
     let rb = engine.cmd.sregs3().rb;
     let rc = engine.cmd.sregs3().rc;
@@ -710,9 +717,10 @@ pub(super) fn execute_xchg_long(engine: &mut Engine) -> Status {
 // (x ... y ... a b - a ... b ... x y)
 // XCHG s(1),s(i); XCHG s(0),s(j).
 pub(super) fn execute_xchg2(engine: &mut Engine) -> Status {
-    engine.load_instruction(Instruction::new("XCHG2").set_opts(
-        InstructionOptions::StackRegisterPair(WhereToGetParams::GetFromNextByte),
-    ))?;
+    engine.load_instruction(
+        Instruction::new("XCHG2")
+            .set_opts(InstructionOptions::StackRegisterPair(WhereToGetParams::GetFromNextByte)),
+    )?;
     let ra = engine.cmd.sregs().ra;
     let rb = engine.cmd.sregs().rb;
     if engine.cc.stack.depth() <= cmp::max(1, cmp::max(ra, rb)) {
@@ -727,9 +735,10 @@ pub(super) fn execute_xchg2(engine: &mut Engine) -> Status {
 // (x ... y ... z ... a b c - c ... b ... a ... z y x)
 // XCHG s(2), s(i); XCHG s(1) s(j); XCHG s(0), s(k)
 pub(super) fn execute_xchg3(engine: &mut Engine) -> Status {
-    engine.load_instruction(Instruction::new("XCHG3").set_opts(
-        InstructionOptions::StackRegisterTrio(WhereToGetParams::GetFromNextByte),
-    ))?;
+    engine.load_instruction(
+        Instruction::new("XCHG3")
+            .set_opts(InstructionOptions::StackRegisterTrio(WhereToGetParams::GetFromNextByte)),
+    )?;
     let ra = engine.cmd.sregs3().ra;
     let rb = engine.cmd.sregs3().rb;
     let rc = engine.cmd.sregs3().rc;
@@ -755,9 +764,10 @@ pub(super) fn execute_xchgx(engine: &mut Engine) -> Status {
 // (x ... y ... a - x ... a ... y x)
 // XCHG s(i), PUSH s(j)
 pub(super) fn execute_xcpu(engine: &mut Engine) -> Status {
-    engine.load_instruction(Instruction::new("XCPU").set_opts(
-        InstructionOptions::StackRegisterPair(WhereToGetParams::GetFromNextByte),
-    ))?;
+    engine.load_instruction(
+        Instruction::new("XCPU")
+            .set_opts(InstructionOptions::StackRegisterPair(WhereToGetParams::GetFromNextByte)),
+    )?;
     let ra = engine.cmd.sregs().ra;
     let rb = engine.cmd.sregs().rb;
     if engine.cc.stack.depth() <= cmp::max(ra, rb) {
@@ -772,9 +782,10 @@ pub(super) fn execute_xcpu(engine: &mut Engine) -> Status {
 // (x ... y ... z ... a - x ... y ... a ... z y x)
 // XCHG s(i), PUSH s(j), PUSH s(k+1)
 pub(super) fn execute_xcpu2(engine: &mut Engine) -> Status {
-    engine.load_instruction(Instruction::new("XCPU2").set_opts(
-        InstructionOptions::StackRegisterTrio(WhereToGetParams::GetFromNextByte),
-    ))?;
+    engine.load_instruction(
+        Instruction::new("XCPU2")
+            .set_opts(InstructionOptions::StackRegisterTrio(WhereToGetParams::GetFromNextByte)),
+    )?;
     let ra = engine.cmd.sregs3().ra;
     let rb = engine.cmd.sregs3().rb;
     let rc = engine.cmd.sregs3().rc;
@@ -788,7 +799,8 @@ pub(super) fn execute_xcpu2(engine: &mut Engine) -> Status {
 }
 
 // (x ... y ... z ... a b - b ... y ... a ... z y x)
-// XCPUXC s(i), s(j), s(k-1): equavalent to XCHG s(1), s(i); PUSH s(j); SWAP; XCHG s(k)
+// XCPUXC s(i), s(j), s(k-1): equavalent to XCHG s(1), s(i); PUSH s(j); SWAP;
+// XCHG s(k)
 pub(super) fn execute_xcpuxc(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("XCPUXC").set_opts(
         InstructionOptions::StackRegisterTrio(WhereToGetParams::GetFromNextByteMinusOne),

@@ -1,48 +1,65 @@
-/*
-* Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    error::{tvm_exception_full, update_error_description, TvmError},
-    executor::{
-        continuation::{switch, switch_to_c0},
-        engine::handlers::Handlers,
-        gas::gas_state::Gas,
-        math::DivMode,
-        microcode::{CTRL, VAR},
-        types::{
-            Instruction, InstructionExt, InstructionOptions, InstructionParameter, LengthAndIndex,
-            RegisterPair, RegisterTrio, WhereToGetParams,
-        },
-    },
-    smart_contract_info::SmartContractInfo,
-    stack::{
-        continuation::{ContinuationData, ContinuationType},
-        integer::IntegerData,
-        savelist::SaveList,
-        Stack, StackItem,
-    },
-    types::{Exception, ResultMut, ResultOpt, ResultRef, Status},
-};
-use std::collections::{HashMap, HashSet};
-use std::{
-    ops::Range,
-    sync::{Arc, Mutex},
-};
-use tvm_block::{Deserializable, GlobalCapabilities, ShardAccount};
-use tvm_types::{
-    error, BuilderData, Cell, CellType, ExceptionCode, GasConsumer, HashmapE, IBitstring, Result,
-    SliceData, UInt256,
-};
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::ops::Range;
+use std::sync::Arc;
+use std::sync::Mutex;
+
+use tvm_block::Deserializable;
+use tvm_block::GlobalCapabilities;
+use tvm_block::ShardAccount;
+use tvm_types::error;
+use tvm_types::BuilderData;
+use tvm_types::Cell;
+use tvm_types::CellType;
+use tvm_types::ExceptionCode;
+use tvm_types::GasConsumer;
+use tvm_types::HashmapE;
+use tvm_types::IBitstring;
+use tvm_types::Result;
+use tvm_types::SliceData;
+use tvm_types::UInt256;
+
+use crate::error::tvm_exception_full;
+use crate::error::update_error_description;
+use crate::error::TvmError;
+use crate::executor::continuation::switch;
+use crate::executor::continuation::switch_to_c0;
+use crate::executor::engine::handlers::Handlers;
+use crate::executor::gas::gas_state::Gas;
+use crate::executor::math::DivMode;
+use crate::executor::microcode::CTRL;
+use crate::executor::microcode::VAR;
+use crate::executor::types::Instruction;
+use crate::executor::types::InstructionExt;
+use crate::executor::types::InstructionOptions;
+use crate::executor::types::InstructionParameter;
+use crate::executor::types::LengthAndIndex;
+use crate::executor::types::RegisterPair;
+use crate::executor::types::RegisterTrio;
+use crate::executor::types::WhereToGetParams;
+use crate::smart_contract_info::SmartContractInfo;
+use crate::stack::continuation::ContinuationData;
+use crate::stack::continuation::ContinuationType;
+use crate::stack::integer::IntegerData;
+use crate::stack::savelist::SaveList;
+use crate::stack::Stack;
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::ResultMut;
+use crate::types::ResultOpt;
+use crate::types::ResultRef;
+use crate::types::Status;
 
 pub(super) type ExecuteHandler = fn(&mut Engine) -> Status;
 
@@ -59,10 +76,7 @@ pub(super) struct SliceProto {
 
 impl Default for SliceProto {
     fn default() -> Self {
-        Self {
-            data_window: 0..0,
-            references_window: 0..0,
-        }
+        Self { data_window: 0..0, references_window: 0..0 }
     }
 }
 
@@ -145,10 +159,7 @@ pub struct EngineTraceInfo<'a> {
 
 impl<'a> EngineTraceInfo<'a> {
     pub fn has_cmd(&self) -> bool {
-        matches!(
-            self.info_type,
-            EngineTraceInfoType::Normal | EngineTraceInfoType::Implicit
-        )
+        matches!(self.info_type, EngineTraceInfoType::Normal | EngineTraceInfoType::Implicit)
     }
 }
 
@@ -161,30 +172,26 @@ pub struct CommittedState {
 
 impl CommittedState {
     pub fn new_empty() -> CommittedState {
-        CommittedState {
-            c4: StackItem::None,
-            c5: StackItem::None,
-            committed: false,
-        }
+        CommittedState { c4: StackItem::None, c5: StackItem::None, committed: false }
     }
+
     pub fn with_params(c4: StackItem, c5: StackItem) -> CommittedState {
         if SaveList::can_put(4, &c4) && SaveList::can_put(5, &c5) {
-            CommittedState {
-                c4,
-                c5,
-                committed: true,
-            }
+            CommittedState { c4, c5, committed: true }
         } else {
             debug_assert!(false);
             CommittedState::new_empty()
         }
     }
+
     pub fn get_actions(&self) -> &StackItem {
         &self.c5
     }
+
     pub fn get_root(&self) -> &StackItem {
         &self.c4
     }
+
     pub fn is_committed(&self) -> bool {
         self.committed
     }
@@ -197,9 +204,11 @@ impl GasConsumer for Engine {
             .finalize(1024)
             .map_err(|err| exception!(ExceptionCode::CellOverflow, "finalize cell error: {}", err))
     }
+
     fn load_cell(&mut self, cell: Cell) -> Result<SliceData> {
         self.load_hashed_cell(cell, true)
     }
+
     fn finalize_cell_and_load(&mut self, builder: BuilderData) -> Result<SliceData> {
         let cell = self.finalize_cell(builder)?;
         self.load_hashed_cell(cell, true)
@@ -211,15 +220,14 @@ lazy_static::lazy_static! {
 }
 
 impl Engine {
-    pub const TRACE_NONE: u8 = 0x00;
-    pub const TRACE_CODE: u8 = 0x01;
-    pub const TRACE_GAS: u8 = 0x02;
-    pub const TRACE_STACK: u8 = 0x04;
-    pub const TRACE_CTRLS: u8 = 0x08;
+    pub(crate) const FLAG_COPYLEFTED: u64 = 0x01;
     pub const TRACE_ALL: u8 = 0xFF;
     pub const TRACE_ALL_BUT_CTRLS: u8 = 0x07;
-
-    pub(crate) const FLAG_COPYLEFTED: u64 = 0x01;
+    pub const TRACE_CODE: u8 = 0x01;
+    pub const TRACE_CTRLS: u8 = 0x08;
+    pub const TRACE_GAS: u8 = 0x02;
+    pub const TRACE_NONE: u8 = 0x00;
+    pub const TRACE_STACK: u8 = 0x04;
 
     // External API ***********************************************************
 
@@ -359,20 +367,11 @@ impl Engine {
     }
 
     pub fn get_stack_result_fift(&self) -> String {
-        self.cc
-            .stack
-            .iter()
-            .map(|item| item.dump_as_fift())
-            .collect::<Vec<_>>()
-            .join(" ")
+        self.cc.stack.iter().map(|item| item.dump_as_fift()).collect::<Vec<_>>().join(" ")
     }
 
     pub fn get_committed_state_fift(&self) -> String {
-        format!(
-            " {} {}",
-            self.cstate.c4.dump_as_fift(),
-            self.cstate.c5.dump_as_fift()
-        )
+        format!(" {} {}", self.cstate.c4.dump_as_fift(), self.cstate.c5.dump_as_fift())
     }
 
     pub fn commit(&mut self) {
@@ -395,11 +394,7 @@ impl Engine {
                     "{}{} {}",
                     self.cmd.proto.name_prefix.unwrap_or_default(),
                     self.cmd.proto.name,
-                    self.cc
-                        .stack
-                        .get(0)
-                        .as_integer()
-                        .unwrap_or(&IntegerData::default())
+                    self.cc.stack.get(0).as_integer().unwrap_or(&IntegerData::default())
                 )
             } else if let Some(string) = log_string {
                 string
@@ -638,6 +633,7 @@ impl Engine {
         *self.cc.code_mut() = code;
         Ok(None)
     }
+
     fn step_ordinary(&mut self) -> Result<Option<i32>> {
         self.step += 1;
         self.log_string = Some("implicit RET");
@@ -648,6 +644,7 @@ impl Engine {
         switch_to_c0(self)?;
         Ok(None)
     }
+
     fn step_pushint(&mut self, code: i32) -> Result<Option<i32>> {
         self.step += 1;
         self.log_string = Some("implicit PUSHINT");
@@ -655,6 +652,7 @@ impl Engine {
         switch(self, ctrl!(0))?;
         Ok(None)
     }
+
     fn step_try_catch(&mut self) -> Result<Option<i32>> {
         self.step += 1;
         self.log_string = Some("IMPLICIT RET FROM TRY-CATCH");
@@ -663,6 +661,7 @@ impl Engine {
         switch(self, ctrl!(0))?;
         Ok(None)
     }
+
     fn step_catch_revert(&mut self, depth: u32) -> Result<Option<i32>> {
         self.step += 1;
         self.log_string = Some("IMPLICIT CATCH REVERT");
@@ -681,6 +680,7 @@ impl Engine {
         switch(self, ctrl!(0))?;
         Ok(None)
     }
+
     fn step_while_loop(&mut self, body: SliceData, cond: SliceData) -> Result<Option<i32>> {
         match self.check_while_loop_condition() {
             Ok(true) => {
@@ -689,8 +689,7 @@ impl Engine {
                 let mut cond = ContinuationData::with_code(cond);
                 let mut while_ = ContinuationData::move_without_stack(&mut self.cc, body);
                 while_.savelist.put_opt(0, self.ctrl_mut(0)?);
-                cond.savelist
-                    .put_opt(0, &mut StackItem::continuation(while_));
+                cond.savelist.put_opt(0, &mut StackItem::continuation(while_));
                 self.ctrls.put_opt(0, &mut StackItem::continuation(cond));
             }
             Ok(false) => {
@@ -700,16 +699,15 @@ impl Engine {
             Err(err) => {
                 if self.check_capabilities(GlobalCapabilities::CapsTvmBugfixes2022 as u64) {
                     let quit = ContinuationType::Quit(ExceptionCode::NormalTermination as i32);
-                    self.ctrls.put(
-                        0,
-                        &mut StackItem::continuation(ContinuationData::with_type(quit)),
-                    )?;
+                    self.ctrls
+                        .put(0, &mut StackItem::continuation(ContinuationData::with_type(quit)))?;
                 }
                 return Err(err);
             }
         }
         Ok(None)
     }
+
     fn step_repeat_loop(&mut self, body: SliceData) -> Result<Option<i32>> {
         if let ContinuationType::RepeatLoopBody(_, ref mut counter) = self.cc.type_of {
             if *counter > 1 {
@@ -726,6 +724,7 @@ impl Engine {
         }
         Ok(None)
     }
+
     fn step_until_loop(&mut self, body: SliceData) -> Result<Option<i32>> {
         match self.check_until_loop_condition() {
             Ok(true) => {
@@ -743,6 +742,7 @@ impl Engine {
         }
         Ok(None)
     }
+
     fn step_again_loop(&mut self, body: SliceData) -> Result<Option<i32>> {
         self.log_string = Some("NEXT AGAIN ITERATION");
         self.discharge_nargs();
@@ -756,10 +756,7 @@ impl Engine {
             && self.cc.nargs != -1
         {
             let depth = self.cc.stack.depth();
-            let _ = self
-                .cc
-                .stack
-                .drop_range_straight((depth - self.cc.nargs as usize)..depth);
+            let _ = self.cc.stack.drop_range_straight((depth - self.cc.nargs as usize)..depth);
             self.cc.nargs = -1;
         }
     }
@@ -852,11 +849,7 @@ impl Engine {
                 return Ok(lib);
             }
         }
-        err!(
-            ExceptionCode::CellUnderflow,
-            "Libraries do not contain code with hash {:x}",
-            hash
-        )
+        err!(ExceptionCode::CellUnderflow, "Libraries do not contain code with hash {:x}", hash)
     }
 
     /// Loads cell to slice checking in precashed map
@@ -978,14 +971,7 @@ impl Engine {
     }
 
     fn dump_msg(message: &'static str, data: String) -> String {
-        format!(
-            "--- {} {:-<4$}\n{}\n{:-<40}\n",
-            message,
-            "",
-            data,
-            "",
-            35 - message.len()
-        )
+        format!("--- {} {:-<4$}\n{}\n{:-<40}\n", message, "", data, "", 35 - message.len())
     }
 
     pub fn dump_ctrls(&self, short: bool) -> String {
@@ -1019,13 +1005,7 @@ impl Engine {
             self.cc
                 .stack
                 .iter()
-                .map(|item| {
-                    if !short {
-                        format!("{}", item)
-                    } else {
-                        item.dump_as_fift()
-                    }
-                })
+                .map(|item| if !short { format!("{}", item) } else { item.dump_as_fift() })
                 .collect::<Vec<_>>()
                 .join("\n"),
         )
@@ -1092,19 +1072,9 @@ impl Engine {
         }
         self.gas = gas.unwrap_or_else(Gas::test);
         let cont = ContinuationType::Quit(ExceptionCode::NormalTermination as i32);
-        self.ctrls
-            .put(
-                0,
-                &mut StackItem::continuation(ContinuationData::with_type(cont)),
-            )
-            .unwrap();
+        self.ctrls.put(0, &mut StackItem::continuation(ContinuationData::with_type(cont))).unwrap();
         let cont = ContinuationType::Quit(ExceptionCode::AlternativeTermination as i32);
-        self.ctrls
-            .put(
-                1,
-                &mut StackItem::continuation(ContinuationData::with_type(cont)),
-            )
-            .unwrap();
+        self.ctrls.put(1, &mut StackItem::continuation(ContinuationData::with_type(cont))).unwrap();
         if self.check_capabilities(GlobalCapabilities::CapsTvmBugfixes2022 as u64) {
             self.ctrls
                 .put(
@@ -1116,22 +1086,12 @@ impl Engine {
                 .unwrap();
         }
         self.ctrls
-            .put(
-                3,
-                &mut StackItem::continuation(ContinuationData::with_code(code.clone())),
-            )
+            .put(3, &mut StackItem::continuation(ContinuationData::with_code(code.clone())))
             .unwrap();
+        self.ctrls.put(4, &mut StackItem::cell(Cell::default())).unwrap();
+        self.ctrls.put(5, &mut StackItem::cell(Cell::default())).unwrap();
         self.ctrls
-            .put(4, &mut StackItem::cell(Cell::default()))
-            .unwrap();
-        self.ctrls
-            .put(5, &mut StackItem::cell(Cell::default()))
-            .unwrap();
-        self.ctrls
-            .put(
-                7,
-                &mut SmartContractInfo::old_default(code.into_cell()).into_temp_data_item(),
-            )
+            .put(7, &mut SmartContractInfo::old_default(code.into_cell()).into_temp_data_item())
             .unwrap();
         if let Some(ref mut ctrls) = ctrls {
             self.ctrls.apply(ctrls);
@@ -1183,15 +1143,17 @@ impl Engine {
         }
     }
 
-    ///Get gas state
+    /// Get gas state
     pub fn get_gas(&self) -> &Gas {
         &self.gas
     }
-    ///Set gas state
+
+    /// Set gas state
     pub fn set_gas(&mut self, gas: Gas) {
         self.gas = gas
     }
-    ///Interface to gas state set_gas_limit method
+
+    /// Interface to gas state set_gas_limit method
     pub fn new_gas_limit(&mut self, gas: i64) {
         self.gas.new_gas_limit(gas)
     }
@@ -1254,34 +1216,24 @@ impl Engine {
             Some(InstructionOptions::ArgumentConstraints) => {
                 let param = self.next_cmd()?;
                 self.basic_use_gas(0);
-                self.cmd
-                    .params
-                    .push(InstructionParameter::Pargs(((param >> 4) & 0x0F) as usize));
-                self.cmd
-                    .params
-                    .push(InstructionParameter::Nargs(if (param & 0x0F) == 15 {
-                        -1
-                    } else {
-                        (param & 0x0F) as isize
-                    }))
+                self.cmd.params.push(InstructionParameter::Pargs(((param >> 4) & 0x0F) as usize));
+                self.cmd.params.push(InstructionParameter::Nargs(if (param & 0x0F) == 15 {
+                    -1
+                } else {
+                    (param & 0x0F) as isize
+                }))
             }
             Some(InstructionOptions::ArgumentAndReturnConstraints) => {
                 let param = self.next_cmd()?;
                 self.basic_use_gas(0);
-                self.cmd
-                    .params
-                    .push(InstructionParameter::Pargs(((param >> 4) & 0x0F) as usize));
-                self.cmd
-                    .params
-                    .push(InstructionParameter::Rargs((param & 0x0F) as usize))
+                self.cmd.params.push(InstructionParameter::Pargs(((param >> 4) & 0x0F) as usize));
+                self.cmd.params.push(InstructionParameter::Rargs((param & 0x0F) as usize))
             }
             Some(InstructionOptions::BigInteger) => {
                 self.basic_use_gas(5);
 
                 let bigint = IntegerData::from_big_endian_octet_stream(|| self.next_cmd())?;
-                self.cmd
-                    .params
-                    .push(InstructionParameter::BigInteger(bigint))
+                self.cmd.params.push(InstructionParameter::BigInteger(bigint))
             }
             Some(InstructionOptions::ControlRegister) => {
                 self.basic_use_gas(0);
@@ -1289,9 +1241,7 @@ impl Engine {
                 if !SaveList::REGS.contains(&creg) {
                     return err!(ExceptionCode::RangeCheckError);
                 }
-                self.cmd
-                    .params
-                    .push(InstructionParameter::ControlRegister(creg))
+                self.cmd.params.push(InstructionParameter::ControlRegister(creg))
             }
             Some(InstructionOptions::DivisionMode) => {
                 let mode = DivMode::with_flags(self.next_cmd()?);
@@ -1301,9 +1251,7 @@ impl Engine {
                 }
                 self.basic_use_gas(0);
                 self.cmd.proto.name = mode.command_name()?;
-                self.cmd
-                    .params
-                    .push(InstructionParameter::DivisionMode(mode));
+                self.cmd.params.push(InstructionParameter::DivisionMode(mode));
             }
             Some(InstructionOptions::Integer(ref range)) => {
                 let number = if *range == (-32768..32768) {
@@ -1362,19 +1310,15 @@ impl Engine {
             }
             Some(InstructionOptions::Length(ref range)) => {
                 if *range == (0..16) {
-                    self.cmd.params.push(InstructionParameter::Length(
-                        (self.last_cmd() & 0x0F) as usize,
-                    ))
+                    self.cmd
+                        .params
+                        .push(InstructionParameter::Length((self.last_cmd() & 0x0F) as usize))
                 } else if *range == (0..4) {
                     let length = self.last_cmd() & 3;
-                    self.cmd
-                        .params
-                        .push(InstructionParameter::Length(length as usize))
+                    self.cmd.params.push(InstructionParameter::Length(length as usize))
                 } else if *range == (1..32) {
                     let length = self.last_cmd() & 0x1F;
-                    self.cmd
-                        .params
-                        .push(InstructionParameter::Length(length as usize))
+                    self.cmd.params.push(InstructionParameter::Length(length as usize))
                 } else {
                     return err!(ExceptionCode::RangeCheckError);
                 }
@@ -1382,16 +1326,15 @@ impl Engine {
             }
             Some(InstructionOptions::LengthAndIndex) => {
                 self.basic_use_gas(0);
-                // This is currently needed only for special-case BLKPUSH command and works the same way
+                // This is currently needed only for special-case BLKPUSH command and works the
+                // same way
                 // as InstructionOptions::StackRegisterPair(WhereToGetParams::GetFromLastByte)
                 let params = self.last_cmd();
                 let (length, index) = (params >> 4, params & 0x0F);
-                self.cmd
-                    .params
-                    .push(InstructionParameter::LengthAndIndex(LengthAndIndex {
-                        length: length as usize,
-                        index: index as usize,
-                    }))
+                self.cmd.params.push(InstructionParameter::LengthAndIndex(LengthAndIndex {
+                    length: length as usize,
+                    index: index as usize,
+                }))
             }
             Some(InstructionOptions::LengthMinusOne(ref range)) => {
                 let len = if *range == (0..8) {
@@ -1409,29 +1352,25 @@ impl Engine {
                 let params = self.next_cmd()?;
                 self.basic_use_gas(0);
                 let (l_minus_1, i_minus_1) = (params >> 4, params & 0x0F);
-                self.cmd
-                    .params
-                    .push(InstructionParameter::LengthAndIndex(LengthAndIndex {
-                        length: (l_minus_1 + 1) as usize,
-                        index: (i_minus_1 + 1) as usize,
-                    }))
+                self.cmd.params.push(InstructionParameter::LengthAndIndex(LengthAndIndex {
+                    length: (l_minus_1 + 1) as usize,
+                    index: (i_minus_1 + 1) as usize,
+                }))
             }
             Some(InstructionOptions::LengthMinusTwoAndIndex) => {
                 let params = self.next_cmd()?;
                 self.basic_use_gas(0);
                 let (l_minus_2, i) = (params >> 4, params & 0x0F);
-                self.cmd
-                    .params
-                    .push(InstructionParameter::LengthAndIndex(LengthAndIndex {
-                        length: (l_minus_2 + 2) as usize,
-                        index: i as usize,
-                    }))
+                self.cmd.params.push(InstructionParameter::LengthAndIndex(LengthAndIndex {
+                    length: (l_minus_2 + 2) as usize,
+                    index: i as usize,
+                }))
             }
             Some(InstructionOptions::Pargs(ref range)) => {
                 if *range == (0..16) {
-                    self.cmd.params.push(InstructionParameter::Pargs(
-                        (self.last_cmd() & 0x0F) as usize,
-                    ))
+                    self.cmd
+                        .params
+                        .push(InstructionParameter::Pargs((self.last_cmd() & 0x0F) as usize))
                 } else {
                     return err!(ExceptionCode::RangeCheckError);
                 }
@@ -1439,9 +1378,9 @@ impl Engine {
             }
             Some(InstructionOptions::Rargs(ref range)) => {
                 if *range == (0..16) {
-                    self.cmd.params.push(InstructionParameter::Rargs(
-                        (self.last_cmd() & 0x0F) as usize,
-                    ))
+                    self.cmd
+                        .params
+                        .push(InstructionParameter::Rargs((self.last_cmd() & 0x0F) as usize))
                 } else {
                     return err!(ExceptionCode::RangeCheckError);
                 }
@@ -1454,9 +1393,7 @@ impl Engine {
                     ))
                 } else if *range == (0..256) {
                     let reg = self.next_cmd()? as usize;
-                    self.cmd
-                        .params
-                        .push(InstructionParameter::StackRegister(reg))
+                    self.cmd.params.push(InstructionParameter::StackRegister(reg))
                 } else {
                     return err!(ExceptionCode::RangeCheckError);
                 }
@@ -1483,12 +1420,10 @@ impl Engine {
                     _ => (0, 0),
                 };
                 self.basic_use_gas(0);
-                self.cmd
-                    .params
-                    .push(InstructionParameter::StackRegisterPair(RegisterPair {
-                        ra: ra as usize,
-                        rb: rb as usize,
-                    }))
+                self.cmd.params.push(InstructionParameter::StackRegisterPair(RegisterPair {
+                    ra: ra as usize,
+                    rb: rb as usize,
+                }))
             }
             Some(InstructionOptions::StackRegisterTrio(ref place)) => {
                 let last = self.last_cmd();
@@ -1507,13 +1442,11 @@ impl Engine {
                     }
                 };
                 self.basic_use_gas(0);
-                self.cmd
-                    .params
-                    .push(InstructionParameter::StackRegisterTrio(RegisterTrio {
-                        ra: ra as usize,
-                        rb: rb as usize,
-                        rc: rc as usize,
-                    }))
+                self.cmd.params.push(InstructionParameter::StackRegisterTrio(RegisterTrio {
+                    ra: ra as usize,
+                    rb: rb as usize,
+                    rc: rc as usize,
+                }))
             }
             Some(InstructionOptions::Dictionary(offset, bits)) => {
                 self.use_gas(Gas::basic_gas_price(offset + 1 + bits, 0));
@@ -1569,12 +1502,11 @@ impl Engine {
             return Err(err);
         }
         let n = self.cmd.vars.len();
-        // self.trace_info(EngineTraceInfoType::Exception, self.gas_used(), Some(format!("EXCEPTION: {}", err)));
+        // self.trace_info(EngineTraceInfoType::Exception, self.gas_used(),
+        // Some(format!("EXCEPTION: {}", err)));
         if let Some(c2) = self.ctrls.get_mut(2) {
             self.cc.stack.push(exception.value.clone());
-            self.cc
-                .stack
-                .push(int!(exception.exception_or_custom_code()));
+            self.cc.stack.push(int!(exception.exception_or_custom_code()));
             c2.as_continuation_mut()?.nargs = 2;
             switch(self, ctrl!(2))?;
         } else if let Some(number) = exception.is_normal_termination() {
@@ -1613,7 +1545,8 @@ impl Engine {
             return Err(err);
         }
         let n = self.cmd.vars.len();
-        // self.trace_info(EngineTraceInfoType::Exception, self.gas_used(), Some(format!("EXCEPTION: {}", err)));
+        // self.trace_info(EngineTraceInfoType::Exception, self.gas_used(),
+        // Some(format!("EXCEPTION: {}", err)));
         let c2 = self.ctrls.remove(2).ok_or(err)?;
         if let Ok(c2) = c2.as_continuation() {
             if c2.type_of == ContinuationType::ExcQuit {
@@ -1627,23 +1560,20 @@ impl Engine {
                 } else {
                     self.cc.stack = Stack::new();
                     self.cc.stack.push(exception.value.clone());
-                    self.cc
-                        .stack
-                        .push(int!(exception.exception_or_custom_code()));
+                    self.cc.stack.push(int!(exception.exception_or_custom_code()));
                     return Err(error!(TvmError::TvmExceptionFull(exception, String::new())));
                 }
             }
         }
         self.cmd.push_var(c2);
         self.cc.stack.push(exception.value.clone());
-        self.cc
-            .stack
-            .push(int!(exception.exception_or_custom_code()));
+        self.cc.stack.push(int!(exception.exception_or_custom_code()));
         let target = self.cmd.vars[n].as_continuation_mut()?;
         match target.type_of {
             ContinuationType::CatchRevert(_depth) => {
-                // Pass the entire cc stack. CatchRevert cont will remove a range of slots
-                // under the exception pair so that the final stack depth is _depth + 2.
+                // Pass the entire cc stack. CatchRevert cont will remove a
+                // range of slots under the exception pair so
+                // that the final stack depth is _depth + 2.
             }
             _ => target.nargs = 2,
         }
@@ -1675,6 +1605,7 @@ impl Engine {
             Err(err) => err.to_string(),
         }
     }
+
     fn cmd_code(&self) -> Result<SliceData> {
         let mut code = match self.cc.code().cell_opt() {
             Some(cell) => SliceData::load_cell_ref(cell)?,
@@ -1723,7 +1654,7 @@ impl Engine {
                     "set tuple index is {} but length is {}",
                     0,
                     tuple.len()
-                )
+                );
             }
         };
         let mut t1_items = t1.as_tuple_mut()?;
@@ -1735,7 +1666,7 @@ impl Engine {
                     "set tuple index is {} but length is {}",
                     6,
                     t1_items.len()
-                )
+                );
             }
         }
         self.use_gas(Gas::tuple_gas_price(t1_items.len()));

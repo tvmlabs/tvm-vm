@@ -1,25 +1,30 @@
-/*
- * Copyright (C) 2021-2023 TON Labs. All Rights Reserved.
- *
- * Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
- * this file except in compliance with the License.
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific TON DEV software governing permissions and
- * limitations under the License.
- */
+// Copyright (C) 2021-2023 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use criterion::{criterion_group, criterion_main, Criterion, SamplingMode};
-use pprof::criterion::{Output, PProfProfiler};
 use std::time::Duration;
-use tvm_block::{Deserializable, StateInit};
+
+use criterion::criterion_group;
+use criterion::criterion_main;
+use criterion::Criterion;
+use criterion::SamplingMode;
+use pprof::criterion::Output;
+use pprof::criterion::PProfProfiler;
+use tvm_block::Deserializable;
+use tvm_block::StateInit;
 use tvm_types::SliceData;
-use tvm_vm::{
-    executor::Engine,
-    stack::{continuation::ContinuationData, savelist::SaveList, Stack, StackItem},
-};
+use tvm_vm::executor::Engine;
+use tvm_vm::stack::continuation::ContinuationData;
+use tvm_vm::stack::savelist::SaveList;
+use tvm_vm::stack::Stack;
+use tvm_vm::stack::StackItem;
 
 static DEFAULT_CAPABILITIES: u64 = 0x572e;
 
@@ -68,9 +73,7 @@ fn bench_elector_algo_1000_vtors(c: &mut Criterion) {
         StackItem::None,
         StackItem::int(0),
     ];
-    ctrls
-        .put(7, &mut StackItem::tuple(vec![StackItem::tuple(params)]))
-        .unwrap();
+    ctrls.put(7, &mut StackItem::tuple(vec![StackItem::tuple(params)])).unwrap();
 
     let mut stack = Stack::new();
     stack.push(StackItem::int(1000000000));
@@ -123,9 +126,7 @@ fn bench_tiny_loop_200000_iters(c: &mut Criterion) {
         StackItem::None,
         StackItem::int(0),
     ];
-    ctrls
-        .put(7, &mut StackItem::tuple(vec![StackItem::tuple(params)]))
-        .unwrap();
+    ctrls.put(7, &mut StackItem::tuple(vec![StackItem::tuple(params)])).unwrap();
 
     let mut stack = Stack::new();
     stack.push(StackItem::int(1000000000));
@@ -239,10 +240,7 @@ fn bench_mergesort_tuple(c: &mut Criterion) {
     // runvmx mode: +1 = same_c3
     let mut ctrls = SaveList::default();
     ctrls
-        .put(
-            3,
-            &mut StackItem::continuation(ContinuationData::with_code(code_slice.clone())),
-        )
+        .put(3, &mut StackItem::continuation(ContinuationData::with_code(code_slice.clone())))
         .unwrap();
 
     let mut stack = Stack::new();
@@ -271,9 +269,7 @@ fn bench_mergesort_tuple(c: &mut Criterion) {
 fn bench_massive_cell_upload(c: &mut Criterion) {
     let stateinit = load_stateinit("benches/massive/cell-upload.tvc");
     let mut ctrls = SaveList::default();
-    ctrls
-        .put(4, &mut StackItem::cell(stateinit.data().unwrap().clone()))
-        .unwrap();
+    ctrls.put(4, &mut StackItem::cell(stateinit.data().unwrap().clone())).unwrap();
     let params = vec![
         StackItem::int(0x76ef1ea),
         StackItem::int(0),
@@ -288,9 +284,7 @@ fn bench_massive_cell_upload(c: &mut Criterion) {
         StackItem::None,
         StackItem::int(0),
     ];
-    ctrls
-        .put(7, &mut StackItem::tuple(vec![StackItem::tuple(params)]))
-        .unwrap();
+    ctrls.put(7, &mut StackItem::tuple(vec![StackItem::tuple(params)])).unwrap();
 
     let msg = load_boc("benches/massive/cell-upload-msg.boc");
     let mut body = SliceData::load_cell_ref(&msg).unwrap();
@@ -321,9 +315,7 @@ fn bench_massive_cell_upload(c: &mut Criterion) {
 fn bench_massive_cell_finalize(c: &mut Criterion) {
     let stateinit = load_stateinit("benches/massive/cell-finalize.tvc");
     let mut ctrls = SaveList::default();
-    ctrls
-        .put(4, &mut StackItem::cell(stateinit.data().unwrap().clone()))
-        .unwrap();
+    ctrls.put(4, &mut StackItem::cell(stateinit.data().unwrap().clone())).unwrap();
     let params = vec![
         StackItem::int(0x76ef1ea),
         StackItem::int(0),
@@ -338,9 +330,7 @@ fn bench_massive_cell_finalize(c: &mut Criterion) {
         StackItem::None,
         StackItem::int(0),
     ];
-    ctrls
-        .put(7, &mut StackItem::tuple(vec![StackItem::tuple(params)]))
-        .unwrap();
+    ctrls.put(7, &mut StackItem::tuple(vec![StackItem::tuple(params)])).unwrap();
 
     let msg = load_boc("benches/massive/cell-finalize-msg.boc");
     let mut body = SliceData::load_cell_ref(&msg).unwrap();

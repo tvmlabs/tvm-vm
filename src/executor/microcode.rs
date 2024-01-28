@@ -1,15 +1,13 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
 macro_rules! declare {
     ($mnemonic:ident, $value:expr) => {
@@ -95,7 +93,7 @@ declare!(SAVELIST, 0x0800); // Savelist
 declare!(BUILDER, 0x0000);
 declare!(CELL, 0x0001);
 declare!(CONTINUATION, 0x0002);
-//declare!(INTEGER,      0x0003);
+// declare!(INTEGER,      0x0003);
 declare!(SLICE, 0x0004);
 
 pub(super) const CC_SAVELIST: u16 = CC | SAVELIST;

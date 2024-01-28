@@ -1,27 +1,28 @@
-/*
-* Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    error::TvmError,
-    executor::{
-        engine::{storage::fetch_stack, Engine},
-        types::Instruction,
-    },
-    stack::{integer::IntegerData, StackItem},
-    types::{Exception, Status},
-};
 use tvm_block::GlobalCapabilities;
-use tvm_types::{error, types::ExceptionCode, BuilderData, IBitstring};
+use tvm_types::error;
+use tvm_types::types::ExceptionCode;
+use tvm_types::BuilderData;
+use tvm_types::IBitstring;
+
+use crate::error::TvmError;
+use crate::executor::engine::storage::fetch_stack;
+use crate::executor::engine::Engine;
+use crate::executor::types::Instruction;
+use crate::stack::integer::IntegerData;
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::Status;
 
 // slice - uint slice'
 fn load_var(engine: &mut Engine, name: &'static str, max_bytes: u8, sign: bool) -> Status {
@@ -67,10 +68,7 @@ fn store_var(engine: &mut Engine, name: &'static str, max_bits: usize, sign: boo
             x.check_neg()?;
             (x.ubitsize()?, x.take_value_of(|x| Some(x.to_bytes_be().1))?)
         }
-        true => (
-            x.bitsize()?,
-            x.take_value_of(|x| Some(x.to_signed_bytes_be()))?,
-        ),
+        true => (x.bitsize()?, x.take_value_of(|x| Some(x.to_signed_bytes_be()))?),
     };
     if bits > max_bits {
         return err!(

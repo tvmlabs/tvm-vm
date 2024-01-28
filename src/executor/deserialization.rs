@@ -1,41 +1,45 @@
-/*
-* Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    error::TvmError,
-    executor::{
-        engine::{data::convert, storage::fetch_stack, Engine},
-        microcode::{CELL, SLICE, VAR},
-        types::{Instruction, InstructionOptions},
-        Mask,
-    },
-    stack::{
-        continuation::ContinuationData,
-        integer::{
-            serialization::{
-                Encoding, SignedIntegerBigEndianEncoding, SignedIntegerLittleEndianEncoding,
-                UnsignedIntegerBigEndianEncoding, UnsignedIntegerLittleEndianEncoding,
-            },
-            IntegerData,
-        },
-        serialization::Deserializer,
-        StackItem,
-    },
-    types::{Exception, Status},
-};
 use std::collections::HashSet;
+
 use tvm_block::GlobalCapabilities;
-use tvm_types::{error, CellType, ExceptionCode, GasConsumer, Result, SliceData};
+use tvm_types::error;
+use tvm_types::CellType;
+use tvm_types::ExceptionCode;
+use tvm_types::GasConsumer;
+use tvm_types::Result;
+use tvm_types::SliceData;
+
+use crate::error::TvmError;
+use crate::executor::engine::data::convert;
+use crate::executor::engine::storage::fetch_stack;
+use crate::executor::engine::Engine;
+use crate::executor::microcode::CELL;
+use crate::executor::microcode::SLICE;
+use crate::executor::microcode::VAR;
+use crate::executor::types::Instruction;
+use crate::executor::types::InstructionOptions;
+use crate::executor::Mask;
+use crate::stack::continuation::ContinuationData;
+use crate::stack::integer::serialization::Encoding;
+use crate::stack::integer::serialization::SignedIntegerBigEndianEncoding;
+use crate::stack::integer::serialization::SignedIntegerLittleEndianEncoding;
+use crate::stack::integer::serialization::UnsignedIntegerBigEndianEncoding;
+use crate::stack::integer::serialization::UnsignedIntegerLittleEndianEncoding;
+use crate::stack::integer::IntegerData;
+use crate::stack::serialization::Deserializer;
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::Status;
 
 const QUIET: u8 = 0x01; // quiet variant
 const STACK: u8 = 0x02; // length of int in stack
@@ -117,7 +121,8 @@ pub fn execute_ldsliceq(engine: &mut Engine) -> Status {
     ld_slice(engine, "LDSLICEQ", 256, CMD | QUIET | STAY)
 }
 
-/// LDSLICE cc+1 (s - s`` s`), cuts the next cc+1 bits of s into a separate Slice s``.
+/// LDSLICE cc+1 (s - s`` s`), cuts the next cc+1 bits of s into a separate
+/// Slice s``.
 pub fn execute_ldslice(engine: &mut Engine) -> Status {
     ld_slice(engine, "LDSLICE", 256, CMD | STAY)
 }
@@ -126,7 +131,8 @@ pub fn execute_pldsliceq(engine: &mut Engine) -> Status {
     ld_slice(engine, "PLDSLICEQ", 256, CMD | QUIET)
 }
 
-/// PLDSLICE cc+1 (s - s``), cuts the next cc+1 bits of s into a separate Slice s``.
+/// PLDSLICE cc+1 (s - s``), cuts the next cc+1 bits of s into a separate Slice
+/// s``.
 pub fn execute_pldslice(engine: &mut Engine) -> Status {
     ld_slice(engine, "PLDSLICE", 256, CMD)
 }
@@ -269,9 +275,7 @@ pub fn execute_pldux(engine: &mut Engine) -> Status {
 pub fn execute_ldref(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("LDREF"))?;
     fetch_stack(engine, 1)?;
-    proc_slice(engine, 0, STAY, |slice, _| {
-        Ok(StackItem::Cell(slice.checked_drain_reference()?))
-    })
+    proc_slice(engine, 0, STAY, |slice, _| Ok(StackItem::Cell(slice.checked_drain_reference()?)))
 }
 
 // (slice - slice' slice'')
@@ -279,9 +283,7 @@ pub fn execute_ldrefrtos(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("LDREFRTOS"))?;
     fetch_stack(engine, 1)?;
     proc_slice(engine, 0, STAY | INV, |slice, gas_consumer| {
-        Ok(StackItem::Slice(
-            gas_consumer.load_cell(slice.checked_drain_reference()?)?,
-        ))
+        Ok(StackItem::Slice(gas_consumer.load_cell(slice.checked_drain_reference()?)?))
     })
 }
 
@@ -314,10 +316,7 @@ pub fn execute_plduz(engine: &mut Engine) -> Status {
     let l = 32 * engine.cmd.length();
     let slice = engine.cmd.var(0).as_slice()?.clone();
     let n = slice.remaining_bits();
-    let mut data = slice
-        .clone()
-        .get_next_slice(std::cmp::min(n, l))?
-        .get_bytestring(0);
+    let mut data = slice.clone().get_next_slice(std::cmp::min(n, l))?.get_bytestring(0);
     if n < l {
         let r = l - n;
         data.extend_from_slice(&vec![0; r / 8]);
@@ -474,14 +473,16 @@ pub fn execute_sdsubstr(engine: &mut Engine) -> Status {
     sdcut(engine, FROM | SIZE, DROP)
 }
 
-/// (s l r – s`), returns the first 0 <= l <= 1023 bits and first 0 <= r <= 4 references of s
+/// (s l r – s`), returns the first 0 <= l <= 1023 bits and first 0 <= r <= 4
+/// references of s
 pub fn execute_scutfirst(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("SCUTFIRST"))?;
     fetch_stack(engine, 3)?;
     sdcut(engine, UPTO, UPTO)
 }
 
-/// (s l r – s`), skips the first 0 <= l <= 1023 bits and first 0 <= r <= 4 references of s
+/// (s l r – s`), skips the first 0 <= l <= 1023 bits and first 0 <= r <= 4
+/// references of s
 pub fn execute_sskipfirst(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("SSKIPFIRST"))?;
     fetch_stack(engine, 3)?;
@@ -619,9 +620,7 @@ fn pldref(engine: &mut Engine, name: &'static str, how: u8) -> Status {
     } else {
         0
     };
-    proc_slice(engine, 0, 0, |slice, _| {
-        Ok(StackItem::Cell(slice.reference(n)?))
-    })
+    proc_slice(engine, 0, 0, |slice, _| Ok(StackItem::Cell(slice.reference(n)?)))
 }
 
 // (slice - cell)
@@ -844,10 +843,7 @@ fn datasize(engine: &mut Engine, name: &'static str, how: u8) -> Status {
             refs = cells - 1;
             cells <= max
         } else {
-            return err!(
-                ExceptionCode::TypeCheckError,
-                "item is neither Cell nor Slice"
-            );
+            return err!(ExceptionCode::TypeCheckError, "item is neither Cell nor Slice");
         }
     } else {
         let mut visited = HashSet::new();
@@ -872,7 +868,8 @@ fn datasize(engine: &mut Engine, name: &'static str, how: u8) -> Status {
                     break false;
                 }
                 cells += 1;
-                // Version 34 contains bug with cell loading without gas calculation. Some blocks with the bug were applied in mainnet, so we have to support it.
+                // Version 34 contains bug with cell loading without gas calculation. Some
+                // blocks with the bug were applied in mainnet, so we have to support it.
                 let slice = if engine.block_version() == 34 {
                     SliceData::load_cell(cell)?
                 } else {

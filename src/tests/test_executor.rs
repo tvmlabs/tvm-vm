@@ -1,34 +1,32 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    executor::{
-        engine::Engine,
-        math::DivMode,
-        serialize_currency_collection,
-        types::{Instruction, InstructionOptions},
-    },
-    stack::{
-        integer::{
-            behavior::{OperationBehavior, Quiet, Signaling},
-            IntegerData,
-        },
-        Stack, StackItem,
-    },
-    types::Status,
-};
 use std::collections::HashSet;
-use tvm_types::{BuilderData, IBitstring, SliceData};
+
+use tvm_types::BuilderData;
+use tvm_types::IBitstring;
+use tvm_types::SliceData;
+
+use crate::executor::engine::Engine;
+use crate::executor::math::DivMode;
+use crate::executor::serialize_currency_collection;
+use crate::executor::types::Instruction;
+use crate::executor::types::InstructionOptions;
+use crate::stack::integer::behavior::OperationBehavior;
+use crate::stack::integer::behavior::Quiet;
+use crate::stack::integer::behavior::Signaling;
+use crate::stack::integer::IntegerData;
+use crate::stack::Stack;
+use crate::stack::StackItem;
+use crate::types::Status;
 
 #[test]
 fn test_assert_stack() {
@@ -46,9 +44,7 @@ fn test_assert_stack() {
 #[test]
 fn test_next_cmd_failed() {
     let mut engine = Engine::with_capabilities(0);
-    engine
-        .next_cmd()
-        .expect_err("Should be generated exception for empty code");
+    engine.next_cmd().expect_err("Should be generated exception for empty code");
 }
 
 #[test]
@@ -159,10 +155,7 @@ where
             }
 
             let (expected_quotient, expected_remainder) = IntegerData::from_i32(value)
-                .div::<T>(
-                    &IntegerData::from_i32(divisor),
-                    mode.rounding_strategy().unwrap(),
-                )
+                .div::<T>(&IntegerData::from_i32(divisor), mode.rounding_strategy().unwrap())
                 .unwrap();
 
             if mode.need_remainder() {

@@ -1,33 +1,35 @@
-/*
-* Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2023 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    error::TvmError,
-    executor::{
-        engine::{storage::fetch_stack, Engine},
-        types::Instruction,
-    },
-    stack::{
-        integer::{serialization::UnsignedIntegerBigEndianEncoding, IntegerData},
-        StackItem,
-    },
-    types::{Exception, Status},
-};
-use ed25519::Signature;
-use ed25519_dalek::{Verifier, VerifyingKey};
 use std::borrow::Cow;
+
+use ed25519::Signature;
+use ed25519_dalek::Verifier;
+use ed25519_dalek::VerifyingKey;
 use tvm_block::GlobalCapabilities;
-use tvm_types::{error, BuilderData, ExceptionCode, GasConsumer, UInt256};
+use tvm_types::error;
+use tvm_types::BuilderData;
+use tvm_types::ExceptionCode;
+use tvm_types::GasConsumer;
+use tvm_types::UInt256;
+
+use crate::error::TvmError;
+use crate::executor::engine::storage::fetch_stack;
+use crate::executor::engine::Engine;
+use crate::executor::types::Instruction;
+use crate::stack::integer::serialization::UnsignedIntegerBigEndianEncoding;
+use crate::stack::integer::IntegerData;
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::Status;
 
 const PUBLIC_KEY_BITS: usize = PUBLIC_KEY_BYTES * 8;
 const SIGNATURE_BITS: usize = SIGNATURE_BYTES * 8;
@@ -48,8 +50,8 @@ pub(super) fn execute_hashcu(engine: &mut Engine) -> Status {
     Ok(())
 }
 
-/// Computes the hash of a Slice s and returns it as a 256-bit unsigned integer x.
-/// The result is the same as if an ordinary cell containing only data
+/// Computes the hash of a Slice s and returns it as a 256-bit unsigned integer
+/// x. The result is the same as if an ordinary cell containing only data
 /// and references from s had been created and its hash computed by HASHCU.
 pub(super) fn execute_hashsu(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("HASHSU"))?;
@@ -63,8 +65,8 @@ pub(super) fn execute_hashsu(engine: &mut Engine) -> Status {
 
 // SHA256U ( s – x )
 // Computes sha256 of the data bits of Slices.
-// If the bit length of s is not divisible by eight, throws a cell underflow exception.
-// The hash value is returned as a 256-bit unsigned integer x.
+// If the bit length of s is not divisible by eight, throws a cell underflow
+// exception. The hash value is returned as a 256-bit unsigned integer x.
 pub(super) fn execute_sha256u(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("SHA256U"))?;
     fetch_stack(engine, 1)?;
@@ -123,11 +125,7 @@ fn check_signature(engine: &mut Engine, name: &'static str, hash: bool) -> Statu
     }
     let data = if hash {
         DataForSignature::Hash(
-            engine
-                .cmd
-                .var(2)
-                .as_integer()?
-                .as_builder::<UnsignedIntegerBigEndianEncoding>(256)?,
+            engine.cmd.var(2).as_integer()?.as_builder::<UnsignedIntegerBigEndianEncoding>(256)?,
         )
     } else {
         if engine.cmd.var(2).as_slice()?.remaining_bits() % 8 != 0 {
@@ -176,17 +174,18 @@ fn check_signature(engine: &mut Engine, name: &'static str, hash: bool) -> Statu
 }
 
 // CHKSIGNS (d s k – ?)
-// checks whether s is a valid Ed25519-signature of the data portion of Slice d using public key k,
-// similarly to CHKSIGNU. If the bit length of Slice d is not divisible by eight,
-// throws a cell underflow exception. The verification of Ed25519 signatures is the standard one,
-// with sha256 used to reduce d to the 256-bit number that is actually signed.
+// checks whether s is a valid Ed25519-signature of the data portion of Slice d
+// using public key k, similarly to CHKSIGNU. If the bit length of Slice d is
+// not divisible by eight, throws a cell underflow exception. The verification
+// of Ed25519 signatures is the standard one, with sha256 used to reduce d to
+// the 256-bit number that is actually signed.
 pub(super) fn execute_chksigns(engine: &mut Engine) -> Status {
     check_signature(engine, "CHKSIGNS", false)
 }
 
 /// CHKSIGNU (h s k – -1 or 0)
-/// checks the Ed25519-signature s (slice) of a hash h (a 256-bit unsigned integer)
-/// using public key k (256-bit unsigned integer).
+/// checks the Ed25519-signature s (slice) of a hash h (a 256-bit unsigned
+/// integer) using public key k (256-bit unsigned integer).
 pub(super) fn execute_chksignu(engine: &mut Engine) -> Status {
     check_signature(engine, "CHKSIGNU", true)
 }

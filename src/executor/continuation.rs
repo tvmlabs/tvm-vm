@@ -1,44 +1,52 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    error::TvmError,
-    executor::{
-        engine::{
-            data::convert,
-            storage::{
-                apply_savelist, apply_savelist_excluding_c0_c1, copy_to_var, fetch_reference,
-                fetch_stack, pop_all, pop_range, swap,
-            },
-            Engine,
-        },
-        microcode::{CC, CELL, CONTINUATION, CTRL, SAVELIST, SLICE, VAR},
-        types::{Instruction, InstructionOptions, InstructionParameter},
-        Mask,
-    },
-    stack::{
-        continuation::{ContinuationData, ContinuationType},
-        integer::{behavior::Signaling, IntegerData},
-        savelist::SaveList,
-        StackItem,
-    },
-    types::{Exception, Status},
-};
-use std::{
-    mem,
-    ops::{Range, RangeInclusive},
-};
-use tvm_types::{error, fail, types::ExceptionCode};
+use std::mem;
+use std::ops::Range;
+use std::ops::RangeInclusive;
+
+use tvm_types::error;
+use tvm_types::fail;
+use tvm_types::types::ExceptionCode;
+
+use crate::error::TvmError;
+use crate::executor::engine::data::convert;
+use crate::executor::engine::storage::apply_savelist;
+use crate::executor::engine::storage::apply_savelist_excluding_c0_c1;
+use crate::executor::engine::storage::copy_to_var;
+use crate::executor::engine::storage::fetch_reference;
+use crate::executor::engine::storage::fetch_stack;
+use crate::executor::engine::storage::pop_all;
+use crate::executor::engine::storage::pop_range;
+use crate::executor::engine::storage::swap;
+use crate::executor::engine::Engine;
+use crate::executor::microcode::CC;
+use crate::executor::microcode::CELL;
+use crate::executor::microcode::CONTINUATION;
+use crate::executor::microcode::CTRL;
+use crate::executor::microcode::SAVELIST;
+use crate::executor::microcode::SLICE;
+use crate::executor::microcode::VAR;
+use crate::executor::types::Instruction;
+use crate::executor::types::InstructionOptions;
+use crate::executor::types::InstructionParameter;
+use crate::executor::Mask;
+use crate::stack::continuation::ContinuationData;
+use crate::stack::continuation::ContinuationType;
+use crate::stack::integer::behavior::Signaling;
+use crate::stack::integer::IntegerData;
+use crate::stack::savelist::SaveList;
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::Status;
 
 const CALLX: u8 = 0x40; // CALLX to found value
 const SWITCH: u8 = 0x80; // SWITCH to found value
@@ -124,13 +132,7 @@ pub(super) fn callx(engine: &mut Engine, callee: usize, need_convert: bool) -> S
         convert(engine, var!(callee), CONTINUATION, CELL)?;
     }
     pop_all(engine, var!(callee))?;
-    let has_c0 = engine
-        .cmd
-        .var(callee)
-        .as_continuation()?
-        .savelist
-        .get(0)
-        .is_some();
+    let has_c0 = engine.cmd.var(callee).as_continuation()?.savelist.get(0).is_some();
     if has_c0 {
         swap(engine, var!(callee), CC)?;
     } else {
@@ -161,10 +163,7 @@ fn fetch_nargs(engine: &mut Engine, idx: usize, nrange: NRange) -> Status {
 fn fetch_pargs(engine: &mut Engine, idx: usize, prange: PRange) -> Status {
     let pargs = engine.cmd.var(idx).as_integer()?.into(prange)?;
     if pargs >= 0 {
-        engine
-            .cmd
-            .params
-            .push(InstructionParameter::Pargs(pargs as usize));
+        engine.cmd.params.push(InstructionParameter::Pargs(pargs as usize));
     }
     Ok(())
 }
@@ -181,8 +180,8 @@ fn fetch_nargs_pargs(engine: &mut Engine, nrange: NRange, prange: PRange) -> Sta
 // } else if continuation.nargs > cc.stack.depth {
 //     StackOverflow
 // } else {
-//     move_out[0..cc.stack.depth + continuation.nargs - continuation.stack.depth]
-// }
+//     move_out[0..cc.stack.depth + continuation.nargs -
+// continuation.stack.depth] }
 // cc.stack -= move_out, continuation.stack += move_in,
 // tmp = cc, cc = continuation, c[*] = cc.savelist[*], cc.stack.push(slice(tmp))
 fn jmpxdata(engine: &mut Engine) -> Status {
@@ -220,7 +219,8 @@ fn save(engine: &mut Engine, index: usize) -> Status {
     }
 }
 
-// (x1 ... xR y {R N} - continuation), y->continuation, continuation.stack.push(x1 ... xR)
+// (x1 ... xR y {R N} - continuation), y->continuation,
+// continuation.stack.push(x1 ... xR)
 fn setcont(engine: &mut Engine, v: usize, need_to_convert: bool) -> Status {
     fetch_stack(engine, v + 1)?; // fetch slice or continuation from stack and nargs/parags
     match v {
@@ -296,11 +296,7 @@ pub(super) fn switch(engine: &mut Engine, continuation: u16) -> Status {
 
 pub(super) fn switch_to_c0(engine: &mut Engine) -> Status {
     pop_all(engine, ctrl!(0))?;
-    let c0 = engine
-        .ctrls
-        .get_mut(0)
-        .ok_or(ExceptionCode::FatalError)?
-        .as_continuation_mut()?;
+    let c0 = engine.ctrls.get_mut(0).ok_or(ExceptionCode::FatalError)?.as_continuation_mut()?;
     mem::swap(&mut engine.cc, c0);
     let drop_c0 = engine.cc.savelist.get(0).is_none();
     engine.ctrls.apply(&mut engine.cc.savelist);
@@ -414,8 +410,8 @@ pub(super) fn execute_blessva(engine: &mut Engine) -> Status {
 //(c - )
 // c'= continuation {PUSHINT -1}, c'[0] = cc
 // c''= continuation {PUSHINT 0}, c''[0] = cc
-//c[0] = c', c[1] = c''
-//execute c
+// c[0] = c', c[1] = c''
+// execute c
 pub(super) fn execute_booleval(engine: &mut Engine) -> Status {
     let mut old_cc_idx = ctrl!(0);
     engine.load_instruction(Instruction::new("BOOLEVAL"))?;
@@ -531,7 +527,8 @@ pub(super) fn execute_callxva(engine: &mut Engine) -> Status {
     callx(engine, 2, false)
 }
 
-// (continuation1 continuation2 - continuation1), continuation1.savelist[0] = continuation2
+// (continuation1 continuation2 - continuation1), continuation1.savelist[0] =
+// continuation2
 pub(super) fn execute_compos(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("COMPOS"))?;
     fetch_stack(engine, 2)?;
@@ -542,7 +539,8 @@ pub(super) fn execute_compos(engine: &mut Engine) -> Status {
     Ok(())
 }
 
-// (continuation1 continuation2 - continuation1), continuation1.savelist[1] = continuation2
+// (continuation1 continuation2 - continuation1), continuation1.savelist[1] =
+// continuation2
 pub(super) fn execute_composalt(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("COMPOSALT"))?;
     fetch_stack(engine, 2)?;
@@ -554,7 +552,8 @@ pub(super) fn execute_composalt(engine: &mut Engine) -> Status {
 }
 
 // (continuation1 continuation2 - continuation1),
-// continuation1.savelist[0] = continuation2, continuation1.savelist[1] = continuation2
+// continuation1.savelist[0] = continuation2, continuation1.savelist[1] =
+// continuation2
 pub(super) fn execute_composboth(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("COMPOSBOTH"))?;
     fetch_stack(engine, 2)?;
@@ -656,7 +655,8 @@ pub(super) fn execute_if(engine: &mut Engine) -> Status {
     execute_if_mask(engine, "IF", CALL)
 }
 
-// (condition continuation1 continuation2 - ): if condition != 0 callx continuation1 else callx continuation2
+// (condition continuation1 continuation2 - ): if condition != 0 callx
+// continuation1 else callx continuation2
 pub(super) fn execute_ifelse(engine: &mut Engine) -> Status {
     execute_if_mask(engine, "IFELSE", CALL | ELSE | INV)
 }
@@ -774,11 +774,7 @@ fn execute_ifbit_mask(engine: &mut Engine, name: &'static str, how: u8) -> Statu
         let test_bit_mask = IntegerData::from_u32(1 << nbit);
         x.and::<Signaling>(&test_bit_mask)?.is_zero()
     };
-    if is_zero ^ how.bit(INV) {
-        Ok(())
-    } else {
-        jmpx(engine, how.bit(REF))
-    }
+    if is_zero ^ how.bit(INV) { Ok(()) } else { jmpx(engine, how.bit(REF)) }
 }
 
 // (x continuation - x), switch if n's bit of x is set
@@ -825,11 +821,7 @@ pub(super) fn execute_repeat(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("REPEAT"))?;
     fetch_stack(engine, 2)?;
     let body = engine.cmd.var(0).as_continuation()?.code().clone();
-    let counter = engine
-        .cmd
-        .var(1)
-        .as_integer()?
-        .into(-0x80000000..=0x7FFFFFFF)?;
+    let counter = engine.cmd.var(1).as_integer()?.into(-0x80000000..=0x7FFFFFFF)?;
     if counter <= 0 {
         Ok(())
     } else {
@@ -852,11 +844,7 @@ pub(super) fn execute_repeat_break(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("REPEATBRK"))?;
     fetch_stack(engine, 2)?;
     let body = engine.cmd.var(0).as_continuation()?.code().clone();
-    let counter = engine
-        .cmd
-        .var(1)
-        .as_integer()?
-        .into(-0x80000000..=0x7FFFFFFF)?;
+    let counter = engine.cmd.var(1).as_integer()?.into(-0x80000000..=0x7FFFFFFF)?;
     if counter <= 0 {
         Ok(())
     } else {
@@ -880,11 +868,7 @@ pub(super) fn execute_repeatend(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("REPEATEND"))?;
     fetch_stack(engine, 1)?;
     let body = engine.cc.code().clone();
-    let counter = engine
-        .cmd
-        .var(0)
-        .as_integer()?
-        .into(-0x80000000..=0x7FFFFFFF)?;
+    let counter = engine.cmd.var(0).as_integer()?.into(-0x80000000..=0x7FFFFFFF)?;
     if counter <= 0 {
         ret(engine)
     } else {
@@ -906,11 +890,7 @@ pub(super) fn execute_repeatend_break(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("REPEATENDBRK"))?;
     fetch_stack(engine, 1)?;
     let body = engine.cc.code().clone();
-    let counter = engine
-        .cmd
-        .var(0)
-        .as_integer()?
-        .into(-0x80000000..=0x7FFFFFFF)?;
+    let counter = engine.cmd.var(0).as_integer()?.into(-0x80000000..=0x7FFFFFFF)?;
     if counter <= 0 {
         ret(engine)
     } else {
@@ -1071,7 +1051,8 @@ pub(super) fn execute_setcontargs(engine: &mut Engine) -> Status {
     setcont(engine, 0, false)
 }
 
-// (x1 ... xR continuation R N - continuation), continuation.stack.push(x1 ... xR)
+// (x1 ... xR continuation R N - continuation), continuation.stack.push(x1 ...
+// xR)
 pub(super) fn execute_setcontva(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("SETCONTVARARGS"))?;
     setcont(engine, 2, false)
@@ -1110,8 +1091,8 @@ pub(super) fn execute_setcontctrx(engine: &mut Engine) -> Status {
     Ok(())
 }
 
-// (continuation - ), continuation.savelist[0] = c[0], continuation.savelist[1] = c[1],
-// c[1] = continuation
+// (continuation - ), continuation.savelist[0] = c[0], continuation.savelist[1]
+// = c[1], c[1] = continuation
 pub(super) fn execute_setexitalt(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("SETEXITALT"))?;
     fetch_stack(engine, 1)?;

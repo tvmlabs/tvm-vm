@@ -1,44 +1,45 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    error::TvmError,
-    executor::{
-        engine::{
-            data::convert,
-            storage::{fetch_reference, fetch_stack},
-            Engine,
-        },
-        gas::gas_state::Gas,
-        microcode::{BUILDER, CC, CELL, VAR},
-        types::{Instruction, InstructionOptions},
-        Mask,
-    },
-    stack::{
-        integer::{
-            serialization::{
-                Encoding, SignedIntegerBigEndianEncoding, SignedIntegerLittleEndianEncoding,
-                UnsignedIntegerBigEndianEncoding, UnsignedIntegerLittleEndianEncoding,
-            },
-            IntegerData,
-        },
-        StackItem,
-    },
-    types::{Exception, Status},
-};
-use tvm_types::{
-    error, BuilderData, CellType, ExceptionCode, GasConsumer, IBitstring, Result, MAX_LEVEL,
-};
+use tvm_types::error;
+use tvm_types::BuilderData;
+use tvm_types::CellType;
+use tvm_types::ExceptionCode;
+use tvm_types::GasConsumer;
+use tvm_types::IBitstring;
+use tvm_types::Result;
+use tvm_types::MAX_LEVEL;
+
+use crate::error::TvmError;
+use crate::executor::engine::data::convert;
+use crate::executor::engine::storage::fetch_reference;
+use crate::executor::engine::storage::fetch_stack;
+use crate::executor::engine::Engine;
+use crate::executor::gas::gas_state::Gas;
+use crate::executor::microcode::BUILDER;
+use crate::executor::microcode::CC;
+use crate::executor::microcode::CELL;
+use crate::executor::microcode::VAR;
+use crate::executor::types::Instruction;
+use crate::executor::types::InstructionOptions;
+use crate::executor::Mask;
+use crate::stack::integer::serialization::Encoding;
+use crate::stack::integer::serialization::SignedIntegerBigEndianEncoding;
+use crate::stack::integer::serialization::SignedIntegerLittleEndianEncoding;
+use crate::stack::integer::serialization::UnsignedIntegerBigEndianEncoding;
+use crate::stack::integer::serialization::UnsignedIntegerLittleEndianEncoding;
+use crate::stack::integer::IntegerData;
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::Status;
 
 const QUIET: u8 = 0x01; // quiet variant
 const STACK: u8 = 0x02; // length of int in stack
@@ -84,17 +85,20 @@ pub fn execute_brefs(engine: &mut Engine) -> Status {
     size_b(engine, "BREFS", REFS)
 }
 
-/// BBITREFS (b - x y), returns the numbers of both data bits and cell references in b.
+/// BBITREFS (b - x y), returns the numbers of both data bits and cell
+/// references in b.
 pub fn execute_bbitrefs(engine: &mut Engine) -> Status {
     size_b(engine, "BBITREFS", BITS | REFS)
 }
 
-/// BREMBITS (b - x`), returns the number of data bits that can still be stored in b.
+/// BREMBITS (b - x`), returns the number of data bits that can still be stored
+/// in b.
 pub fn execute_brembits(engine: &mut Engine) -> Status {
     size_b(engine, "BREMBITS", INV | BITS)
 }
 
-/// BREMREFS (b - y`), returns the number of references that can still be stored in b.
+/// BREMREFS (b - y`), returns the number of references that can still be stored
+/// in b.
 pub fn execute_bremrefs(engine: &mut Engine) -> Status {
     size_b(engine, "BREMREFS", INV | REFS)
 }
@@ -122,10 +126,7 @@ pub fn execute_endxc(engine: &mut Engine) -> Status {
     if special {
         if b.length_in_bits() < 8 {
             engine.use_gas(Gas::finalize_price());
-            return err!(
-                ExceptionCode::CellOverflow,
-                "Not enough data for a special cell"
-            );
+            return err!(ExceptionCode::CellOverflow, "Not enough data for a special cell");
         }
         match CellType::try_from(b.data()[0]) {
             Ok(cell_type) => b.set_type(cell_type),
@@ -369,11 +370,7 @@ fn check_b(engine: &mut Engine, name: &'static str, how: u8) -> Status {
     } else {
         0
     };
-    let r = if how.bit(REFS) {
-        engine.cmd.var(0).as_integer()?.into(0..=4)?
-    } else {
-        0
-    };
+    let r = if how.bit(REFS) { engine.cmd.var(0).as_integer()?.into(0..=4)? } else { 0 };
     let b = engine.cmd.var(params - 1).as_builder()?;
     let mut status = true;
     if how.bit(BITS) {

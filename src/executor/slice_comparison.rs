@@ -1,25 +1,22 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    executor::{
-        engine::{storage::fetch_stack, Engine},
-        types::Instruction,
-    },
-    stack::{integer::IntegerData, StackItem},
-    types::Status,
-};
 use tvm_types::SliceData;
+
+use crate::executor::engine::storage::fetch_stack;
+use crate::executor::engine::Engine;
+use crate::executor::types::Instruction;
+use crate::stack::integer::IntegerData;
+use crate::stack::StackItem;
+use crate::types::Status;
 
 fn unary<F>(engine: &mut Engine, name: &'static str, operation: F) -> Status
 where
@@ -70,16 +67,12 @@ pub(super) fn execute_sempty(engine: &mut Engine) -> Status {
 
 /// SDEMPTY (s – s ≈ ∅), checks whether Slice s has no bits of data.
 pub(super) fn execute_sdempty(engine: &mut Engine) -> Status {
-    unary(engine, "SDEMPTY", |slice| {
-        boolean!(slice.remaining_bits() == 0)
-    })
+    unary(engine, "SDEMPTY", |slice| boolean!(slice.remaining_bits() == 0))
 }
 
 /// SREMPTY (s – r(s) = 0), checks whether Slice s has no refer- ences.
 pub(super) fn execute_srempty(engine: &mut Engine) -> Status {
-    unary(engine, "SREMPTY", |slice| {
-        boolean!(slice.remaining_references() == 0)
-    })
+    unary(engine, "SREMPTY", |slice| boolean!(slice.remaining_references() == 0))
 }
 
 /// SDFIRST (s – s0 = 1), checks whether the first bit of Slice s is a one.
@@ -90,17 +83,14 @@ pub(super) fn execute_sdfirst(engine: &mut Engine) -> Status {
 }
 
 /// SDLEXCMP (s s′ – c), compares the data of s lexicographically
-/// with the data of s′, returning −1, 0, or 1 depending on the result. s > s` => 1
+/// with the data of s′, returning −1, 0, or 1 depending on the result. s > s`
+/// => 1
 pub(super) fn execute_sdlexcmp(engine: &mut Engine) -> Status {
     common_prefix(engine, "SDLEXCMP", |r_s1, r_s0| {
         int!(if r_s0.is_none() && r_s1.is_none() {
             0
         } else if r_s0.is_some() && r_s1.is_some() {
-            if r_s1.unwrap().get_next_bit().unwrap() {
-                1
-            } else {
-                -1
-            }
+            if r_s1.unwrap().get_next_bit().unwrap() { 1 } else { -1 }
         } else if r_s1.is_some() {
             1
         } else {
@@ -112,9 +102,7 @@ pub(super) fn execute_sdlexcmp(engine: &mut Engine) -> Status {
 /// SDEQ(s s′ – s ≈ s′), checks whether the data parts of s and s′ coincide,
 /// equivalent to SDLEXCMP; ISZERO.
 pub(super) fn execute_sdeq(engine: &mut Engine) -> Status {
-    common_prefix(engine, "SDEQ", |r_s1, r_s0| {
-        boolean!(r_s0.is_none() && r_s1.is_none())
-    })
+    common_prefix(engine, "SDEQ", |r_s1, r_s0| boolean!(r_s0.is_none() && r_s1.is_none()))
 }
 
 /// SDPFX (s s′ – ?), checks whether s is a prefix of s′.
@@ -131,16 +119,12 @@ pub(super) fn execute_sdpfxrev(engine: &mut Engine) -> Status {
 /// SDPPFX (s s′ – ?), checks whether s is a proper prefix of s′
 /// (i.e., prefix distinct from s′).
 pub(super) fn execute_sdppfx(engine: &mut Engine) -> Status {
-    common_prefix(engine, "SDPPFX", |r_s1, r_s0| {
-        boolean!(r_s0.is_some() && r_s1.is_none())
-    })
+    common_prefix(engine, "SDPPFX", |r_s1, r_s0| boolean!(r_s0.is_some() && r_s1.is_none()))
 }
 
 /// SDPPFXREV (s s′ – ?), checks whether s′ is a proper prefix of s.
 pub(super) fn execute_sdppfxrev(engine: &mut Engine) -> Status {
-    common_prefix(engine, "SDPPFXREV", |r_s1, r_s0| {
-        boolean!(r_s0.is_none() && r_s1.is_some())
-    })
+    common_prefix(engine, "SDPPFXREV", |r_s1, r_s0| boolean!(r_s0.is_none() && r_s1.is_some()))
 }
 
 /// SDSFX(s s′ – ?), checks whether s is a suffix of s′.
@@ -216,9 +200,7 @@ pub(super) fn execute_sdcntlead0(engine: &mut Engine) -> Status {
     unary(engine, "SDCNTLEAD0", |slice| {
         int!({
             let n = slice.remaining_bits();
-            (0..n)
-                .position(|i| slice.get_bit_opt(i) == Some(true))
-                .unwrap_or(n)
+            (0..n).position(|i| slice.get_bit_opt(i) == Some(true)).unwrap_or(n)
         })
     })
 }
@@ -228,9 +210,7 @@ pub(super) fn execute_sdcntlead1(engine: &mut Engine) -> Status {
     unary(engine, "SDCNTLEAD1", |slice| {
         int!({
             let n = slice.remaining_bits();
-            (0..n)
-                .position(|i| slice.get_bit_opt(i) == Some(false))
-                .unwrap_or(n)
+            (0..n).position(|i| slice.get_bit_opt(i) == Some(false)).unwrap_or(n)
         })
     })
 }
@@ -240,9 +220,7 @@ pub(super) fn execute_sdcnttrail0(engine: &mut Engine) -> Status {
     unary(engine, "SDCNTTRAIL0", |slice| {
         int!({
             let n = slice.remaining_bits();
-            (0..n)
-                .position(|i| slice.get_bit_opt(n - i - 1) == Some(true))
-                .unwrap_or(n)
+            (0..n).position(|i| slice.get_bit_opt(n - i - 1) == Some(true)).unwrap_or(n)
         })
     })
 }
@@ -252,9 +230,7 @@ pub(super) fn execute_sdcnttrail1(engine: &mut Engine) -> Status {
     unary(engine, "SDCNTTRAIL1", |slice| {
         int!({
             let n = slice.remaining_bits();
-            (0..n)
-                .position(|i| slice.get_bit_opt(n - i - 1) == Some(false))
-                .unwrap_or(n)
+            (0..n).position(|i| slice.get_bit_opt(n - i - 1) == Some(false)).unwrap_or(n)
         })
     })
 }

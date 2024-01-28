@@ -1,20 +1,26 @@
-/*
-* Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{error::TvmError, types::Exception};
-use tvm_types::{
-    error, fail, BuilderData, Cell, ExceptionCode, GasConsumer, Result, SliceData, MAX_DATA_BITS,
-};
+use tvm_types::error;
+use tvm_types::fail;
+use tvm_types::BuilderData;
+use tvm_types::Cell;
+use tvm_types::ExceptionCode;
+use tvm_types::GasConsumer;
+use tvm_types::Result;
+use tvm_types::SliceData;
+use tvm_types::MAX_DATA_BITS;
+
+use crate::error::TvmError;
+use crate::types::Exception;
 
 /// Pack data as a list of single-reference cells
 pub fn pack_data_to_cell(bytes: &[u8], engine: &mut dyn GasConsumer) -> Result<Cell> {
@@ -54,7 +60,7 @@ pub fn unpack_data_from_cell(mut cell: SliceData, engine: &mut dyn GasConsumer) 
                 return err!(
                     ExceptionCode::TypeCheckError,
                     "Incorrect representation of string in cells"
-                )
+                );
             }
         }
     }
@@ -62,11 +68,7 @@ pub fn unpack_data_from_cell(mut cell: SliceData, engine: &mut dyn GasConsumer) 
 
 pub(crate) fn bytes_to_string(data: Vec<u8>) -> Result<String> {
     String::from_utf8(data).map_err(|err| {
-        exception!(
-            ExceptionCode::TypeCheckError,
-            "Cannot create utf8 string: {}",
-            err
-        )
+        exception!(ExceptionCode::TypeCheckError, "Cannot create utf8 string: {}", err)
     })
 }
 

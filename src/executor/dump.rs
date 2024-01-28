@@ -1,28 +1,29 @@
-/*
-* Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2022 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::{
-    error::TvmError,
-    executor::{
-        engine::Engine,
-        types::{Instruction, InstructionOptions},
-        Mask,
-    },
-    stack::StackItem,
-    types::{Exception, Status},
-};
-use std::{cmp, str, sync::Arc};
-use tvm_types::{error, types::ExceptionCode};
+use std::cmp;
+use std::str;
+use std::sync::Arc;
+
+use tvm_types::error;
+use tvm_types::types::ExceptionCode;
+
+use crate::error::TvmError;
+use crate::executor::engine::Engine;
+use crate::executor::types::Instruction;
+use crate::executor::types::InstructionOptions;
+use crate::executor::Mask;
+use crate::stack::StackItem;
+use crate::types::Exception;
+use crate::types::Status;
 
 const STR: u8 = 0x01;
 const HEX: u8 = 0x02;
@@ -41,10 +42,7 @@ fn dump_tuple_impl(x: &[StackItem], how: u8, in_tuple: bool) -> String {
     } else {
         format!(
             "({})",
-            x.iter()
-                .map(|v| dump_var_impl(v, how, true))
-                .collect::<Vec<_>>()
-                .join(", ")
+            x.iter().map(|v| dump_var_impl(v, how, true)).collect::<Vec<_>>().join(", ")
         )
     }
 }
@@ -55,10 +53,9 @@ fn dump_var_impl(item: &StackItem, how: u8, in_tuple: bool) -> String {
             StackItem::None => String::new(),
             StackItem::Builder(x) => format!("BC<{:X}>", Arc::as_ref(x)),
             StackItem::Cell(x) => format!("C<{:X}>", x),
-            StackItem::Continuation(x) => x
-                .code()
-                .cell_opt()
-                .map_or(String::new(), |cell| format!("R<{:X}>", cell)),
+            StackItem::Continuation(x) => {
+                x.code().cell_opt().map_or(String::new(), |cell| format!("R<{:X}>", cell))
+            }
             StackItem::Integer(x) => format!("{:X}", Arc::as_ref(x)),
             StackItem::Slice(x) => {
                 format!("CS<{:X}>({}..{})", x, x.pos(), x.pos() + x.remaining_bits())
@@ -70,18 +67,12 @@ fn dump_var_impl(item: &StackItem, how: u8, in_tuple: bool) -> String {
             StackItem::None => String::new(),
             StackItem::Builder(x) => format!("BC<{:b}>", Arc::as_ref(x)),
             StackItem::Cell(x) => format!("C<{:b}>", x),
-            StackItem::Continuation(x) => x
-                .code()
-                .cell_opt()
-                .map_or(String::new(), |cell| format!("R<{:b}>", cell)),
+            StackItem::Continuation(x) => {
+                x.code().cell_opt().map_or(String::new(), |cell| format!("R<{:b}>", cell))
+            }
             StackItem::Integer(x) => format!("{:b}", Arc::as_ref(x)),
             StackItem::Slice(x) => x.cell_opt().map_or(String::new(), |cell| {
-                format!(
-                    "CS<{:b}>({}..{})",
-                    cell,
-                    x.pos(),
-                    x.pos() + x.remaining_bits()
-                )
+                format!("CS<{:b}>({}..{})", cell, x.pos(), x.pos() + x.remaining_bits())
             }),
             StackItem::Tuple(x) => dump_tuple_impl(x, how, in_tuple),
         }
@@ -104,18 +95,12 @@ fn dump_var_impl(item: &StackItem, how: u8, in_tuple: bool) -> String {
             StackItem::None => String::new(),
             StackItem::Builder(x) => format!("BC<{:X}>", Arc::as_ref(x)),
             StackItem::Cell(x) => format!("C<{:X}>", x),
-            StackItem::Continuation(x) => x
-                .code()
-                .cell_opt()
-                .map_or(String::new(), |cell| format!("R<{:X}>", cell)),
+            StackItem::Continuation(x) => {
+                x.code().cell_opt().map_or(String::new(), |cell| format!("R<{:X}>", cell))
+            }
             StackItem::Integer(x) => format!("{}", Arc::as_ref(x)),
             StackItem::Slice(x) => x.cell_opt().map_or(String::new(), |cell| {
-                format!(
-                    "CS<{:X}>({}..{})",
-                    cell,
-                    x.pos(),
-                    x.pos() + x.remaining_bits()
-                )
+                format!("CS<{:X}>({}..{})", cell, x.pos(), x.pos() + x.remaining_bits())
             }),
             StackItem::Tuple(x) => dump_tuple_impl(x, how, in_tuple),
         }
@@ -276,13 +261,7 @@ where
                 op(engine, string)?
             }
         }
-        Err(err) => {
-            return err!(
-                ExceptionCode::InvalidOpcode,
-                "convert from utf-8 error {}",
-                err
-            )
-        }
+        Err(err) => return err!(ExceptionCode::InvalidOpcode, "convert from utf-8 error {}", err),
     }
     if how.bit(FLUSH) {
         engine.flush();

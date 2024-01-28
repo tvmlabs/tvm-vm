@@ -1,48 +1,52 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
+use std::fmt;
+use std::ops::Range;
+
+use tvm_types::error;
+use tvm_types::types::ExceptionCode;
+use tvm_types::Result;
+
+use crate::error::TvmError;
+use crate::executor::accounts::*;
+use crate::executor::blockchain::*;
+use crate::executor::config::*;
+use crate::executor::continuation::*;
+use crate::executor::crypto::*;
+use crate::executor::currency::*;
+use crate::executor::deserialization::*;
+use crate::executor::dictionary::*;
 #[cfg(feature = "gosh")]
 use crate::executor::diff::*;
-use crate::{
-    error::TvmError,
-    executor::{
-        accounts::*,
-        blockchain::*,
-        config::*,
-        continuation::*,
-        crypto::*,
-        currency::*,
-        deserialization::*,
-        dictionary::*,
-        dump::*,
-        engine::{core::ExecuteHandler, storage::fetch_stack, Engine},
-        exceptions::*,
-        gas::*,
-        globals::*,
-        math::*,
-        null::*,
-        rand::*,
-        serialization::*,
-        slice_comparison::*,
-        stack::*,
-        tuple::*,
-        types::{Instruction, InstructionOptions},
-    },
-    stack::integer::behavior::{Quiet, Signaling},
-    types::{Exception, Status},
-};
-use std::{fmt, ops::Range};
-use tvm_types::{error, types::ExceptionCode, Result};
+use crate::executor::dump::*;
+use crate::executor::engine::core::ExecuteHandler;
+use crate::executor::engine::storage::fetch_stack;
+use crate::executor::engine::Engine;
+use crate::executor::exceptions::*;
+use crate::executor::gas::*;
+use crate::executor::globals::*;
+use crate::executor::math::*;
+use crate::executor::null::*;
+use crate::executor::rand::*;
+use crate::executor::serialization::*;
+use crate::executor::slice_comparison::*;
+use crate::executor::stack::*;
+use crate::executor::tuple::*;
+use crate::executor::types::Instruction;
+use crate::executor::types::InstructionOptions;
+use crate::stack::integer::behavior::Quiet;
+use crate::stack::integer::behavior::Signaling;
+use crate::types::Exception;
+use crate::types::Status;
 
 // ( - )
 fn execute_nop(engine: &mut Engine) -> Status {
@@ -61,11 +65,7 @@ fn execute_setcp(engine: &mut Engine) -> Status {
 fn execute_setcpx(engine: &mut Engine) -> Status {
     engine.load_instruction(Instruction::new("SETCPX"))?;
     fetch_stack(engine, 1)?;
-    let code_page = engine
-        .cmd
-        .var(0)
-        .as_integer()?
-        .into(-1 << 15..=1 << (15 - 1))?;
+    let code_page = engine.cmd.var(0).as_integer()?.into(-1 << 15..=1 << (15 - 1))?;
     *engine.code_page_mut() = code_page;
     Ok(())
 }
@@ -90,10 +90,7 @@ pub struct Handlers {
 
 impl Handlers {
     const fn new() -> Handlers {
-        Handlers {
-            directs: [None; 256],
-            subsets: Vec::new(),
-        }
+        Handlers { directs: [None; 256], subsets: Vec::new() }
     }
 
     pub(super) fn new_code_page_0() -> Handlers {
@@ -180,60 +177,56 @@ impl Handlers {
             .set(0x6B, execute_onlyx)
             .add_subset(
                 0x6C,
-                Handlers::new()
-                    .set_range(0x10..0xFF, execute_blkdrop2)
-                    .set(0xFF, execute_blkdrop2),
+                Handlers::new().set_range(0x10..0xFF, execute_blkdrop2).set(0xFF, execute_blkdrop2),
             )
     }
 
     fn add_code_page_0_tuple(&mut self) -> &mut Handlers {
-        self.set(0x6D, execute_null)
-            .set(0x6E, execute_isnull)
-            .add_subset(
-                0x6F,
-                Handlers::new()
-                    .set_range(0x00..0x10, execute_tuple_create)
-                    .set_range(0x10..0x20, execute_tuple_index)
-                    .set_range(0x20..0x30, execute_tuple_un)
-                    .set_range(0x30..0x40, execute_tuple_unpackfirst)
-                    .set_range(0x40..0x50, execute_tuple_explode)
-                    .set_range(0x50..0x60, execute_tuple_setindex)
-                    .set_range(0x60..0x70, execute_tuple_index_quiet)
-                    .set_range(0x70..0x80, execute_tuple_setindex_quiet)
-                    .set(0x80, execute_tuple_createvar)
-                    .set(0x81, execute_tuple_indexvar)
-                    .set(0x82, execute_tuple_untuplevar)
-                    .set(0x83, execute_tuple_unpackfirstvar)
-                    .set(0x84, execute_tuple_explodevar)
-                    .set(0x85, execute_tuple_setindexvar)
-                    .set(0x86, execute_tuple_indexvar_quiet)
-                    .set(0x87, execute_tuple_setindexvar_quiet)
-                    .set(0x88, execute_tuple_len)
-                    .set(0x89, execute_tuple_len_quiet)
-                    .set(0x8A, execute_istuple)
-                    .set(0x8B, execute_tuple_last)
-                    .set(0x8C, execute_tuple_push)
-                    .set(0x8D, execute_tuple_pop)
-                    .set(0x90, execute_zeroswapif)
-                    .set(0x91, execute_zeroswapifnot)
-                    .set(0x92, execute_zerorotrif)
-                    .set(0x93, execute_zerorotrifnot)
-                    .set(0x94, execute_zeroswapif2)
-                    .set(0x95, execute_zeroswapifnot2)
-                    .set(0x96, execute_zerorotrif2)
-                    .set(0x97, execute_zerorotrifnot2)
-                    .set(0xA0, execute_nullswapif)
-                    .set(0xA1, execute_nullswapifnot)
-                    .set(0xA2, execute_nullrotrif)
-                    .set(0xA3, execute_nullrotrifnot)
-                    .set(0xA4, execute_nullswapif2)
-                    .set(0xA5, execute_nullswapifnot2)
-                    .set(0xA6, execute_nullrotrif2)
-                    .set(0xA7, execute_nullrotrifnot2)
-                    .set_range(0xB0..0xC0, execute_tuple_index2)
-                    .set_range(0xC0..0xFF, execute_tuple_index3)
-                    .set(0xFF, execute_tuple_index3),
-            )
+        self.set(0x6D, execute_null).set(0x6E, execute_isnull).add_subset(
+            0x6F,
+            Handlers::new()
+                .set_range(0x00..0x10, execute_tuple_create)
+                .set_range(0x10..0x20, execute_tuple_index)
+                .set_range(0x20..0x30, execute_tuple_un)
+                .set_range(0x30..0x40, execute_tuple_unpackfirst)
+                .set_range(0x40..0x50, execute_tuple_explode)
+                .set_range(0x50..0x60, execute_tuple_setindex)
+                .set_range(0x60..0x70, execute_tuple_index_quiet)
+                .set_range(0x70..0x80, execute_tuple_setindex_quiet)
+                .set(0x80, execute_tuple_createvar)
+                .set(0x81, execute_tuple_indexvar)
+                .set(0x82, execute_tuple_untuplevar)
+                .set(0x83, execute_tuple_unpackfirstvar)
+                .set(0x84, execute_tuple_explodevar)
+                .set(0x85, execute_tuple_setindexvar)
+                .set(0x86, execute_tuple_indexvar_quiet)
+                .set(0x87, execute_tuple_setindexvar_quiet)
+                .set(0x88, execute_tuple_len)
+                .set(0x89, execute_tuple_len_quiet)
+                .set(0x8A, execute_istuple)
+                .set(0x8B, execute_tuple_last)
+                .set(0x8C, execute_tuple_push)
+                .set(0x8D, execute_tuple_pop)
+                .set(0x90, execute_zeroswapif)
+                .set(0x91, execute_zeroswapifnot)
+                .set(0x92, execute_zerorotrif)
+                .set(0x93, execute_zerorotrifnot)
+                .set(0x94, execute_zeroswapif2)
+                .set(0x95, execute_zeroswapifnot2)
+                .set(0x96, execute_zerorotrif2)
+                .set(0x97, execute_zerorotrifnot2)
+                .set(0xA0, execute_nullswapif)
+                .set(0xA1, execute_nullswapifnot)
+                .set(0xA2, execute_nullrotrif)
+                .set(0xA3, execute_nullrotrifnot)
+                .set(0xA4, execute_nullswapif2)
+                .set(0xA5, execute_nullswapifnot2)
+                .set(0xA6, execute_nullrotrif2)
+                .set(0xA7, execute_nullrotrifnot2)
+                .set_range(0xB0..0xC0, execute_tuple_index2)
+                .set_range(0xC0..0xFF, execute_tuple_index3)
+                .set(0xFF, execute_tuple_index3),
+        )
     }
 
     fn add_code_page_0_part_constant(&mut self) -> &mut Handlers {
@@ -241,9 +234,7 @@ impl Handlers {
             .set(0x82, execute_pushint_big)
             .add_subset(
                 0x83,
-                Handlers::new()
-                    .set_range(0x00..0xFF, execute_pushpow2)
-                    .set(0xFF, execute_pushnan),
+                Handlers::new().set_range(0x00..0xFF, execute_pushpow2).set(0xFF, execute_pushnan),
             )
             .set(0x84, execute_pushpow2dec)
             .set(0x85, execute_pushnegpow2)
@@ -951,6 +942,7 @@ impl Handlers {
                 .set(0x50, execute_try_elect),
         )
     }
+
     /// Dumping functions
     fn add_code_page_0_debug(&mut self) -> &mut Handlers {
         self.add_subset(
@@ -988,16 +980,14 @@ impl Handlers {
             Some(Handler::Direct(x)) => {
                 if x as usize == execute_unknown as usize {
                     self.directs[code as usize] = Some(Handler::Subset(self.subsets.len()));
-                    self.subsets
-                        .push(std::mem::replace(subset, Handlers::new()))
+                    self.subsets.push(std::mem::replace(subset, Handlers::new()))
                 } else {
                     panic!("Slot for subset {:02x} is already occupied", code)
                 }
             }
             None => {
                 self.directs[code as usize] = Some(Handler::Subset(self.subsets.len()));
-                self.subsets
-                    .push(std::mem::replace(subset, Handlers::new()))
+                self.subsets.push(std::mem::replace(subset, Handlers::new()))
             }
             _ => panic!("Subset {:02x} is already registered", code),
         }

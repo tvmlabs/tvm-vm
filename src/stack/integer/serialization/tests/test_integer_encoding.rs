@@ -1,24 +1,21 @@
-/*
-* Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
-*
-* Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
-* this file except in compliance with the License.
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific TON DEV software governing permissions and
-* limitations under the License.
-*/
+// Copyright (C) 2019-2021 TON Labs. All Rights Reserved.
+//
+// Licensed under the SOFTWARE EVALUATION License (the "License"); you may not
+// use this file except in compliance with the License.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific TON DEV software governing permissions and
+// limitations under the License.
 
-use crate::stack::{
-    integer::{
-        serialization::{Encoding, SignedIntegerBigEndianEncoding},
-        IntegerData,
-    },
-    serialization::{Deserializer, Serializer},
-    BuilderData, SliceData,
-};
+use crate::stack::integer::serialization::Encoding;
+use crate::stack::integer::serialization::SignedIntegerBigEndianEncoding;
+use crate::stack::integer::IntegerData;
+use crate::stack::serialization::Deserializer;
+use crate::stack::serialization::Serializer;
+use crate::stack::BuilderData;
+use crate::stack::SliceData;
 
 #[test]
 fn encoding_one_positive_byte() {
