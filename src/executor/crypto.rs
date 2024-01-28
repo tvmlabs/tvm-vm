@@ -23,7 +23,8 @@ use crate::{
     },
     types::{Exception, Status},
 };
-use ed25519::signature::Verifier;
+use ed25519::Signature;
+use ed25519_dalek::{Verifier, VerifyingKey};
 use std::borrow::Cow;
 use tvm_block::GlobalCapabilities;
 use tvm_types::{error, BuilderData, ExceptionCode, GasConsumer, UInt256};
@@ -134,7 +135,7 @@ fn check_signature(engine: &mut Engine, name: &'static str, hash: bool) -> Statu
         }
         DataForSignature::Slice(engine.cmd.var(2).as_slice()?.get_bytestring(0))
     };
-    let pub_key = match ed25519_dalek::PublicKey::from_bytes(pub_key.data()) {
+    let pub_key = match VerifyingKey::try_from(pub_key.data()) {
         Ok(pub_key) => pub_key,
         Err(err) => {
             if engine.check_capabilities(GlobalCapabilities::CapsTvmBugfixes2022 as u64) {
@@ -146,7 +147,7 @@ fn check_signature(engine: &mut Engine, name: &'static str, hash: bool) -> Statu
         }
     };
     let signature = engine.cmd.var(1).as_slice()?.get_bytestring(0);
-    let signature = match ed25519::signature::Signature::from_bytes(&signature[..SIGNATURE_BYTES]) {
+    let signature = match Signature::try_from(&signature[..SIGNATURE_BYTES]) {
         Ok(signature) => signature,
         Err(err) =>
         {
