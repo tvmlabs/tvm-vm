@@ -13,15 +13,18 @@
 
 use crate::{
     executor::{
-        Mask, engine::{Engine, storage::fetch_stack}, gas::gas_state::Gas,
-        types::{Instruction, InstructionOptions}
+        engine::{storage::fetch_stack, Engine},
+        gas::gas_state::Gas,
+        types::{Instruction, InstructionOptions},
+        Mask,
     },
-    stack::StackItem, types::Status
+    stack::StackItem,
+    types::Status,
 };
 
 const STACK: u8 = 0x02;
-const CMD:   u8 = 0x04;
-const SET:   u8 = 0x10;
+const CMD: u8 = 0x04;
+const SET: u8 = 0x10;
 
 fn execute_setget_globalvar(engine: &mut Engine, name: &'static str, how: u8) -> Status {
     let mut inst = Instruction::new(name);

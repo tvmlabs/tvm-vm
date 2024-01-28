@@ -12,9 +12,12 @@
 */
 
 use crate::stack::{
+    integer::{
+        serialization::{Encoding, SignedIntegerBigEndianEncoding},
+        IntegerData,
+    },
+    serialization::{Deserializer, Serializer},
     BuilderData, SliceData,
-    integer::{IntegerData, serialization::{Encoding, SignedIntegerBigEndianEncoding}},
-    serialization::{Serializer, Deserializer}
 };
 
 #[test]

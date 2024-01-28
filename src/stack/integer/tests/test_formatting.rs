@@ -23,6 +23,9 @@ fn test_formatting() {
 
     assert_eq!(value.to_str(), format!("{}", value));
     assert_eq!(value.to_str_radix(16), format!("{:x}", value));
-    assert_eq!(value.to_str_radix(16).to_uppercase(), format!("{:X}", value));
+    assert_eq!(
+        value.to_str_radix(16).to_uppercase(),
+        format!("{:X}", value)
+    );
     assert_eq!(value.to_str_radix(2), format!("{:b}", value));
 }

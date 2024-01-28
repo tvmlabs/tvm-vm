@@ -12,39 +12,38 @@
 */
 
 use crate::{
-    executor::{Mask, engine::{Engine, storage::fetch_stack}, types::Instruction},
-    stack::{StackItem, integer::IntegerData}, types::Status
+    executor::{
+        engine::{storage::fetch_stack, Engine},
+        types::Instruction,
+        Mask,
+    },
+    stack::{integer::IntegerData, StackItem},
+    types::Status,
 };
 
 pub(super) fn execute_null(engine: &mut Engine) -> Status {
-    engine.load_instruction(
-        Instruction::new("NULL")
-    )?;
+    engine.load_instruction(Instruction::new("NULL"))?;
     engine.cc.stack.push(StackItem::None);
     Ok(())
 }
 
 pub(super) fn execute_isnull(engine: &mut Engine) -> Status {
-    engine.load_instruction(
-        Instruction::new("ISNULL")
-    )?;
+    engine.load_instruction(Instruction::new("ISNULL"))?;
     fetch_stack(engine, 1)?;
     let result = engine.cmd.var(0).is_null();
     engine.cc.stack.push(boolean!(result));
     Ok(())
 }
 
-const ARG: u8 = 0x03;     // args number
-const DBL: u8 = 0x04;     // DouBLe NULL in result
-const INV: u8 = 0x08;     // INVert rule to get output value: get it upon unsuccessful call
-const ZERO: u8 = 0x10;    // zeroswapif instead nullswapif
+const ARG: u8 = 0x03; // args number
+const DBL: u8 = 0x04; // DouBLe NULL in result
+const INV: u8 = 0x08; // INVert rule to get output value: get it upon unsuccessful call
+const ZERO: u8 = 0x10; // zeroswapif instead nullswapif
 
 fn nullzeroswapif(engine: &mut Engine, name: &'static str, how: u8) -> Status {
     let args = how.mask(ARG);
     debug_assert!(args == 1 || args == 2);
-    engine.load_instruction(
-        Instruction::new(name)
-    )?;
+    engine.load_instruction(Instruction::new(name))?;
     fetch_stack(engine, args as usize)?;
     let new_element = if how.bit(ZERO) {
         int!(0)
@@ -110,7 +109,9 @@ pub(super) fn execute_zeroswapif(engine: &mut Engine) -> Status {
 }
 
 // cell - (cell) | (0 0 cell)
-pub(super) fn execute_zeroswapif2(engine: &mut Engine) -> Status { nullzeroswapif(engine, "ZEROSWAPIF2", 1 | DBL | ZERO) }
+pub(super) fn execute_zeroswapif2(engine: &mut Engine) -> Status {
+    nullzeroswapif(engine, "ZEROSWAPIF2", 1 | DBL | ZERO)
+}
 
 // cell - (cell) | (0 cell)
 pub(super) fn execute_zeroswapifnot(engine: &mut Engine) -> Status {

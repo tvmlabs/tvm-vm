@@ -12,14 +12,14 @@
 */
 
 use crate::stack::{
-    SliceData,
     integer::{
-        IntegerData,
         serialization::{
             Encoding, SignedIntegerBigEndianEncoding, SignedIntegerLittleEndianEncoding,
-            UnsignedIntegerBigEndianEncoding, UnsignedIntegerLittleEndianEncoding
-        }
-    }
+            UnsignedIntegerBigEndianEncoding, UnsignedIntegerLittleEndianEncoding,
+        },
+        IntegerData,
+    },
+    SliceData,
 };
 
 #[test]
@@ -43,7 +43,8 @@ fn test_unsigned_little_endian_ser_deser() {
 }
 
 fn test_ser_deser<T>()
-where T: Encoding
+where
+    T: Encoding,
 {
     let initial = IntegerData::from_str_radix("18AB_C0435ACE", 16).unwrap();
 

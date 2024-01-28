@@ -13,23 +13,23 @@
 
 use crate::stack::{
     integer::IntegerData,
-    serialization::{Serializer, Deserializer}
+    serialization::{Deserializer, Serializer},
 };
 
-pub trait Encoding : Serializer<IntegerData> + Deserializer<IntegerData> {
+pub trait Encoding: Serializer<IntegerData> + Deserializer<IntegerData> {
     fn new(length_in_bits: usize) -> Self;
 }
 
 pub mod common;
 mod signed_big_endian;
-mod unsigned_big_endian;
 mod signed_little_endian;
+mod unsigned_big_endian;
 mod unsigned_little_endian;
 
-pub use self::unsigned_little_endian::UnsignedIntegerLittleEndianEncoding;
-pub use self::unsigned_big_endian::UnsignedIntegerBigEndianEncoding;
 pub use self::signed_big_endian::SignedIntegerBigEndianEncoding;
 pub use self::signed_little_endian::SignedIntegerLittleEndianEncoding;
+pub use self::unsigned_big_endian::UnsignedIntegerBigEndianEncoding;
+pub use self::unsigned_little_endian::UnsignedIntegerLittleEndianEncoding;
 
 #[cfg(test)]
 #[path = "tests/test_integer_encoding.rs"]

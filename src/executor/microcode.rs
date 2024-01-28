@@ -85,18 +85,18 @@ macro_rules! var {
 }
 
 // Address tags
-declare!(CC,           0x0000); // Current continuation
-declare!(CTRL,         0x0100); // Control register
-declare!(STACK,        0x0200); // Data stack
-declare!(VAR,          0x0300); // Instruction variable
-declare!(SAVELIST,     0x0800); // Savelist
+declare!(CC, 0x0000); // Current continuation
+declare!(CTRL, 0x0100); // Control register
+declare!(STACK, 0x0200); // Data stack
+declare!(VAR, 0x0300); // Instruction variable
+declare!(SAVELIST, 0x0800); // Savelist
 
 // Data tags
-declare!(BUILDER,      0x0000);
-declare!(CELL,         0x0001);
+declare!(BUILDER, 0x0000);
+declare!(CELL, 0x0001);
 declare!(CONTINUATION, 0x0002);
 //declare!(INTEGER,      0x0003);
-declare!(SLICE,        0x0004);
+declare!(SLICE, 0x0004);
 
 pub(super) const CC_SAVELIST: u16 = CC | SAVELIST;
 pub(super) const CTRL_SAVELIST: u16 = CTRL | SAVELIST;

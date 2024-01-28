@@ -26,11 +26,18 @@ fn check_additional_fields(capabilities: u64, count: usize) {
     };
     let item = sci.into_temp_data_item();
     let result = item
-        .as_tuple().expect("result must be a tuple")
-        .get(0).expect("tuple must have at least one item")
-        .as_tuple().expect("SMCI list must be a tuple")
+        .as_tuple()
+        .expect("result must be a tuple")
+        .get(0)
+        .expect("tuple must have at least one item")
+        .as_tuple()
+        .expect("SMCI list must be a tuple")
         .len();
-    assert_eq!(result, count, "wrong total count for capabilities {:X}", capabilities);
+    assert_eq!(
+        result, count,
+        "wrong total count for capabilities {:X}",
+        capabilities
+    );
 }
 
 #[test]
@@ -40,7 +47,7 @@ fn test_smart_contract_info_with_different_caps() {
     check_additional_fields(GlobalCapabilities::CapStorageFeeToTvm as u64, 13);
     check_additional_fields(GlobalCapabilities::CapDelections as u64, 14);
 
-    let capabilities = GlobalCapabilities::CapMycode as u64
-        | GlobalCapabilities::CapStorageFeeToTvm as u64;
+    let capabilities =
+        GlobalCapabilities::CapMycode as u64 | GlobalCapabilities::CapStorageFeeToTvm as u64;
     check_additional_fields(capabilities, 13);
 }

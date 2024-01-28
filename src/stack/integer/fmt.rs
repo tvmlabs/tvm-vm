@@ -11,10 +11,7 @@
 * limitations under the License.
 */
 
-use super::{
-    IntegerData,
-    IntegerValue,
-};
+use super::{IntegerData, IntegerValue};
 use std::fmt;
 
 impl IntegerData {
