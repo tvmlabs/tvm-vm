@@ -1,10 +1,11 @@
 [package]
-edition = '2021'
-name = 'tvm_vm'
+edition = "2021"
+name = "tvm_vm"
 rust-version = "1.75.0"
-version = '2.0.0'
+version = "2.0.0"
 
 [dependencies]
+diffy = { optional = true, version = "0.3.0" }
 ed25519 = "2.2.3"
 ed25519-dalek = "2.1.0"
 failure = "0.1.8"
@@ -14,30 +15,29 @@ log = "0.4.20"
 num = "0.4.1"
 num-traits = "0.2.17"
 rand = "0.8.5"
-diffy = { optional = true, version = "0.3.0" }
-similar = { features = [ 'bytes' ], optional = true, version = "2.4.0" }
-tvm_block = { git = 'https://github.com/tvmlabs/tvm-block.git', branch = "main" }
-tvm_types = { git = 'https://github.com/tvmlabs/tvm-types.git', branch = "main" }
+similar = { features = ["bytes"], optional = true, version = "2.4.0" }
+tvm_block = { git = "https://github.com/tvmlabs/tvm-block", branch = "main" }
+tvm_types = { git = "https://github.com/tvmlabs/tvm-types", branch = "main" }
 zstd = { default-features = false, optional = true, version = "0.13.0" }
 
 [dev-dependencies]
 criterion = "0.5.1"
 libloading = "0.8.1"
 log4rs = "1.2.0"
+pprof = { features = ["criterion", "flamegraph"], version = "0.13.0" }
 pretty_assertions = "1.4.0"
-pprof = { features = [ 'criterion', 'flamegraph' ], version = "0.13.0" }
 
 [features]
-fift_check = [  ]
-gosh = [ 'tvm_block/gosh', 'diffy', 'similar', 'zstd' ]
-log_file = [  ]
-signature_no_check = [  ]
-signature_with_id = [ 'tvm_block/signature_with_id' ]
-verbose = [  ]
+fift_check = []
+gosh = ["tvm_block/gosh", "diffy", "similar", "zstd"]
+log_file = []
+signature_no_check = []
+signature_with_id = ["tvm_block/signature_with_id"]
+verbose = []
 
 [[bench]]
 harness = false
-name = 'benchmarks'
+name = "benchmarks"
 
 [lib]
 bench = false
