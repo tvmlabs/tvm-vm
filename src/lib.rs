@@ -25,4 +25,6 @@ pub use self::smart_contract_info::SmartContractInfo;
 pub mod error;
 pub mod utils;
 
-include!("../common/src/info.rs");
+pub fn build_commit() -> Option<&'static str> {
+    std::option_env!("BUILD_GIT_COMMIT")
+}

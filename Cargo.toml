@@ -1,8 +1,8 @@
 [package]
-build = 'common/build/build.rs'
 edition = '2021'
 name = 'tvm_vm'
-version = '1.8.227'
+rust-version = "1.75.0"
+version = '2.0.0'
 
 [dependencies]
 ed25519 = '1.2'
