@@ -9,6 +9,7 @@
 // See the License for the specific TON DEV software governing permissions and
 // limitations under the License.
 
+use thiserror::Error;
 use tvm_types::error;
 use tvm_types::fail;
 use tvm_types::ExceptionCode;
@@ -16,23 +17,23 @@ use tvm_types::Result;
 
 use crate::types::Exception;
 
-#[derive(Debug, failure::Fail)]
+#[derive(Debug, Error)]
 pub enum TvmError {
     /// Fatal error.
-    #[fail(display = "Fatal error: {}", 0)]
+    #[error("Fatal error: {}", 0)]
     FatalError(String),
     /// Invalid argument.
-    #[fail(display = "Invalid argument: {}", 0)]
+    #[error("Invalid argument: {}", 0)]
     InvalidArg(usize),
     /// Invalid data.
-    #[fail(display = "Invalid data: {}", 0)]
+    #[error("Invalid data: {}", 0)]
     InvalidData(String),
     /// TVM Exception description
-    #[fail(display = "VM Exception: {} {}", 0, 1)]
+    #[error("VM Exception: {} {}", 0, 1)]
     TvmExceptionFull(Exception, String),
 }
 
-pub fn tvm_exception(err: failure::Error) -> Result<Exception> {
+pub fn tvm_exception(err: anyhow::Error) -> Result<Exception> {
     match err.downcast::<TvmError>() {
         Ok(TvmError::TvmExceptionFull(err, _)) => Ok(err),
         Ok(err) => fail!(err),
@@ -46,7 +47,7 @@ pub fn tvm_exception(err: failure::Error) -> Result<Exception> {
     }
 }
 
-pub fn tvm_exception_code(err: &failure::Error) -> Option<ExceptionCode> {
+pub fn tvm_exception_code(err: &anyhow::Error) -> Option<ExceptionCode> {
     match err.downcast_ref::<TvmError>() {
         Some(TvmError::TvmExceptionFull(err, _)) => err.exception_code(),
         Some(_) => None,
@@ -54,7 +55,7 @@ pub fn tvm_exception_code(err: &failure::Error) -> Option<ExceptionCode> {
     }
 }
 
-pub fn tvm_exception_or_custom_code(err: &failure::Error) -> i32 {
+pub fn tvm_exception_or_custom_code(err: &anyhow::Error) -> i32 {
     match err.downcast_ref::<TvmError>() {
         Some(TvmError::TvmExceptionFull(err, _)) => err.exception_or_custom_code(),
         Some(_) => ExceptionCode::UnknownError as i32,
@@ -68,7 +69,7 @@ pub fn tvm_exception_or_custom_code(err: &failure::Error) -> i32 {
     }
 }
 
-pub fn tvm_exception_full(err: &failure::Error) -> Option<Exception> {
+pub fn tvm_exception_full(err: &anyhow::Error) -> Option<Exception> {
     match err.downcast_ref::<TvmError>() {
         Some(TvmError::TvmExceptionFull(err, _)) => Some(err.clone()),
         Some(_) => None,
@@ -79,9 +80,9 @@ pub fn tvm_exception_full(err: &failure::Error) -> Option<Exception> {
 }
 
 pub fn update_error_description(
-    mut err: failure::Error,
+    mut err: anyhow::Error,
     f: impl FnOnce(&str) -> String,
-) -> failure::Error {
+) -> anyhow::Error {
     match err.downcast_mut::<TvmError>() {
         Some(TvmError::TvmExceptionFull(_err, descr)) => *descr = f(descr.as_str()),
         Some(_) => (),

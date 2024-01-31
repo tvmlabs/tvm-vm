@@ -152,7 +152,7 @@ impl IntegerData {
 }
 
 impl std::str::FromStr for IntegerData {
-    type Err = failure::Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self> {
         Self::from_str_radix(s, 10)

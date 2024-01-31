@@ -1482,7 +1482,7 @@ impl Engine {
 
     // raises the exception and tries to dispatch it via c(2).
     // If c(2) is not set, returns that exception, otherwise, returns None
-    fn raise_exception(&mut self, err: failure::Error) -> Status {
+    fn raise_exception(&mut self, err: anyhow::Error) -> Status {
         let exception = match tvm_exception_full(&err) {
             Some(exception) => exception,
             None => {
@@ -1525,7 +1525,7 @@ impl Engine {
 
     // raises the exception and tries to dispatch it via c(2).
     // If c(2) is not set, returns that exception, otherwise, returns None
-    fn raise_exception_bugfix0(&mut self, err: failure::Error) -> Result<Option<i32>> {
+    fn raise_exception_bugfix0(&mut self, err: anyhow::Error) -> Result<Option<i32>> {
         let exception = match tvm_exception_full(&err) {
             Some(exception) => exception,
             None => {
