@@ -22,7 +22,8 @@ fn check_additional_fields(capabilities: u64, count: usize) {
     let item = sci.into_temp_data_item();
     let result = item
         .as_tuple()
-        .expect("result must be a tuple").first()
+        .expect("result must be a tuple")
+        .first()
         .expect("tuple must have at least one item")
         .as_tuple()
         .expect("SMCI list must be a tuple")
