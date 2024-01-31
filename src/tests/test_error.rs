@@ -35,7 +35,12 @@ fn test_update_error() {
     let err = update_error_description(err, |d| format!("additional: {}", d));
     println!("{:?}", err);
     assert_eq!(tvm_exception_code(&err).unwrap(), ExceptionCode::RangeCheckError);
-    assert!(err.to_string().contains("additional: "));
+
+    let Ok(TvmError::TvmExceptionFull(_, ref description)) = err.downcast::<TvmError>() else {
+        unreachable!("wrong TvmError enum type");
+    };
+
+    assert!(description.contains("additional: "));
 
     // TODO: make fail! more informative
     // let err = || -> Result<()> { fail!(ExceptionCode::RangeCheckError, "lost
