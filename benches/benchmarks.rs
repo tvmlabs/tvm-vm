@@ -162,7 +162,7 @@ fn bench_num_bigint(c: &mut Criterion) {
             let mut accum = num::BigInt::from(0);
             let mut iter = num::BigInt::from(0);
             loop {
-                if !(iter < n) {
+                if iter >= n {
                     break;
                 }
                 accum += num::BigInt::from(iter.bits());
@@ -208,15 +208,15 @@ fn make_array(input: &[i64], row_size: usize) -> StackItem {
     assert!(input.len() <= row_size * MAX_TUPLE_SIZE);
     let mut row = Vec::new();
     let mut rows = Vec::new();
-    for i in 0..input.len() {
-        row.push(StackItem::int(input[i]));
+    for (i, &item) in input.iter().enumerate() {
+        row.push(StackItem::int(item));
         if (i + 1) % row_size == 0 {
             assert_eq!(row.len(), row_size);
             rows.push(StackItem::tuple(row));
             row = Vec::new();
         }
     }
-    if row.len() > 0 {
+    if !row.is_empty() {
         rows.push(StackItem::tuple(row));
     }
     StackItem::tuple(rows)
@@ -300,7 +300,7 @@ fn bench_massive_cell_upload(c: &mut Criterion) {
     c.bench_function("massive-cell-upload", |b| {
         b.iter(|| {
             let mut engine = Engine::with_capabilities(DEFAULT_CAPABILITIES).setup_with_libraries(
-                SliceData::load_cell_ref(&stateinit.code().unwrap()).unwrap(),
+                SliceData::load_cell_ref(stateinit.code().unwrap()).unwrap(),
                 Some(ctrls.clone()),
                 Some(stack.clone()),
                 None,
@@ -346,7 +346,7 @@ fn bench_massive_cell_finalize(c: &mut Criterion) {
     c.bench_function("massive-cell-finalize", |b| {
         b.iter(|| {
             let mut engine = Engine::with_capabilities(DEFAULT_CAPABILITIES).setup_with_libraries(
-                SliceData::load_cell_ref(&stateinit.code().unwrap()).unwrap(),
+                SliceData::load_cell_ref(stateinit.code().unwrap()).unwrap(),
                 Some(ctrls.clone()),
                 Some(stack.clone()),
                 None,
