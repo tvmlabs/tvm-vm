@@ -45,6 +45,7 @@ pub(super) fn execute_balance(engine: &mut Engine) -> Status {
 
 // ( - D 32)
 pub(super) fn execute_config_dict(engine: &mut Engine) -> Status {
+    engine.mark_execution_as_block_related()?;
     engine.load_instruction(Instruction::new("CONFIGDICT"))?;
     let dict = engine.smci_param(9)?.clone();
     engine.cc.stack.push(dict);
@@ -54,11 +55,13 @@ pub(super) fn execute_config_dict(engine: &mut Engine) -> Status {
 
 /// (i - c?)
 pub(super) fn execute_config_opt_param(engine: &mut Engine) -> Status {
+    engine.mark_execution_as_block_related()?;
     execute_config_param(engine, "CONFIGOPTPARAM", true)
 }
 
 /// (i - c -1 or 0)
 pub(super) fn execute_config_ref_param(engine: &mut Engine) -> Status {
+    engine.mark_execution_as_block_related()?;
     execute_config_param(engine, "CONFIGPARAM", false)
 }
 
@@ -71,26 +74,31 @@ fn extract_config(engine: &mut Engine, name: &'static str) -> Status {
 
 // - D
 pub(super) fn execute_config_root(engine: &mut Engine) -> Status {
+    engine.mark_execution_as_block_related()?;
     extract_config(engine, "CONFIGROOT")
 }
 
 // - x
 pub(super) fn execute_getparam(engine: &mut Engine) -> Status {
+    engine.mark_execution_as_block_related()?;
     extract_config(engine, "GETPARAM")
 }
 
 // - integer
 pub(super) fn execute_now(engine: &mut Engine) -> Status {
+    engine.mark_execution_as_block_related()?;
     extract_config(engine, "NOW")
 }
 
 // - integer
 pub(super) fn execute_blocklt(engine: &mut Engine) -> Status {
-    extract_config(engine, "BLOCKLT")
+    engine.mark_execution_as_block_related()?;
+     extract_config(engine, "BLOCKLT")
 }
 
 // - integer
 pub(super) fn execute_ltime(engine: &mut Engine) -> Status {
+    engine.mark_execution_as_block_related()?;
     extract_config(engine, "LTIME")
 }
 
@@ -107,6 +115,7 @@ pub(super) fn execute_my_code(engine: &mut Engine) -> Status {
 
 // - x
 pub(super) fn execute_randseed(engine: &mut Engine) -> Status {
+    engine.mark_execution_as_block_related()?;
     extract_config(engine, "RANDSEED")
 }
 
@@ -119,11 +128,13 @@ pub(super) fn execute_init_code_hash(engine: &mut Engine) -> Status {
 // - integer
 pub(super) fn execute_seq_no(engine: &mut Engine) -> Status {
     engine.check_capability(GlobalCapabilities::CapDelections)?;
+    engine.mark_execution_as_block_related()?;
     extract_config(engine, "SEQNO")
 }
 
 // - integer
 pub(super) fn execute_storage_fees_collected(engine: &mut Engine) -> Status {
     engine.check_capability(GlobalCapabilities::CapStorageFeeToTvm)?;
+    engine.mark_execution_as_block_related()?;
     extract_config(engine, "STORAGEFEE")
 }

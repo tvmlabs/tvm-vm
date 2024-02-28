@@ -39,6 +39,7 @@ pub(crate) fn execute_addrand(engine: &mut Engine) -> Status {
 
 // (y - z)
 pub(crate) fn execute_rand(engine: &mut Engine) -> Status {
+    engine.mark_execution_as_block_related()?;
     engine.load_instruction(Instruction::new("RAND"))?;
     fetch_stack(engine, 1)?;
     let sha512 =
@@ -52,6 +53,7 @@ pub(crate) fn execute_rand(engine: &mut Engine) -> Status {
 
 // ( - x)
 pub(crate) fn execute_randu256(engine: &mut Engine) -> Status {
+    engine.mark_execution_as_block_related()?;
     engine.load_instruction(Instruction::new("RANDU256"))?;
     let sha512 =
         sha512_digest(engine.rand()?.as_builder::<UnsignedIntegerBigEndianEncoding>(256)?.data());

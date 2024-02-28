@@ -66,23 +66,27 @@ fn execute_setget_globalvar(engine: &mut Engine, name: &'static str, how: u8) ->
 // GETGLOBVAR (k–x), returns the k-th global variable for 0 ≤ k < 255.
 // Equivalent to PUSH c7; SWAP; INDEXVARQ
 pub(super) fn execute_getglobvar(engine: &mut Engine) -> Status {
+    engine.mark_execution_as_block_related()?;
     execute_setget_globalvar(engine, "GETGLOBVAR", STACK)
 }
 
 // GETGLOB k( –x), returns the k-th global variable for 1 ≤ k ≤ 31
 // Equivalent to PUSH c7; INDEXQ k.
 pub(super) fn execute_getglob(engine: &mut Engine) -> Status {
+    engine.mark_execution_as_block_related()?;
     execute_setget_globalvar(engine, "GETGLOB", CMD)
 }
 
 // SETGLOBVAR (x k– ), assigns x to the k-th global variable for 0 ≤ k <255.
 // Equivalent to PUSH c7; ROTREV; SETINDEXVARQ; POP c7.
 pub(super) fn execute_setglobvar(engine: &mut Engine) -> Status {
+    engine.mark_execution_as_block_related()?;
     execute_setget_globalvar(engine, "SETGLOBVAR", SET | STACK)
 }
 
 // SETGLOB k (x– ), assigns x to the k-th global variable for 1 ≤ k ≤ 31.
 // Equivalent to PUSH c7; SWAP; SETINDEXQ k; POP c7
 pub(super) fn execute_setglob(engine: &mut Engine) -> Status {
+    engine.mark_execution_as_block_related()?;
     execute_setget_globalvar(engine, "SETGLOB", SET | CMD)
 }
