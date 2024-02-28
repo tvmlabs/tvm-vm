@@ -125,6 +125,8 @@ pub struct Engine {
     block_version: u32,
     #[cfg(feature = "signature_with_id")]
     signature_id: i32,
+    vm_execution_is_block_related: Arc<Mutex<bool>>,
+    block_collation_was_finished: Arc<Mutex<bool>>,
 }
 
 #[cfg(feature = "signature_no_check")]
@@ -282,6 +284,34 @@ impl Engine {
             block_version: 0,
             #[cfg(feature = "signature_with_id")]
             signature_id: 0,
+            vm_execution_is_block_related: Arc::new(Mutex::new(false)),
+            block_collation_was_finished: Arc::new(Mutex::new(false)),
+        }
+    }
+
+    pub fn set_block_related_flags(
+        &mut self,
+        vm_execution_is_block_related: Arc<Mutex<bool>>,
+        block_collation_was_finished: Arc<Mutex<bool>>,
+    ) {
+        self.vm_execution_is_block_related = vm_execution_is_block_related;
+        self.block_collation_was_finished = block_collation_was_finished;
+    }
+
+    pub fn mark_execution_as_block_related(&mut self) -> Status {
+        log::trace!("Mark execution as block related");
+        {
+            let mut flag = self.vm_execution_is_block_related.lock().unwrap();
+            *flag = true;
+        }
+        let block_was_finalized = self.block_collation_was_finished.lock().unwrap();
+        if *block_was_finalized {
+            err!(
+                ExceptionCode::UnknownError,
+                "Transaction is block related and block was finalized before it's finalization."
+            )
+        } else {
+            Ok(())
         }
     }
 
