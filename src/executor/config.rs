@@ -93,7 +93,7 @@ pub(super) fn execute_now(engine: &mut Engine) -> Status {
 // - integer
 pub(super) fn execute_blocklt(engine: &mut Engine) -> Status {
     engine.mark_execution_as_block_related()?;
-     extract_config(engine, "BLOCKLT")
+    extract_config(engine, "BLOCKLT")
 }
 
 // - integer

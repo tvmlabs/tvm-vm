@@ -306,7 +306,10 @@ impl Engine {
         }
         let block_was_finalized = self.block_collation_was_finished.lock().unwrap();
         if *block_was_finalized {
-            err!(ExceptionCode::UnknownError, "Transaction is block related and block was finalized before it's finalization.")
+            err!(
+                ExceptionCode::UnknownError,
+                "Transaction is block related and block was finalized before it's finalization."
+            )
         } else {
             Ok(())
         }
